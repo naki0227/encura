@@ -76,8 +76,7 @@ class MapService {
       var query = _supabase
           .from('venue_maps')
           .select('image_url')
-          .eq('is_verified', true)
-          .order('created_at', ascending: false);
+          .eq('is_verified', true);
       
       if (venueId != null) {
         query = query.eq('venue_id', venueId);
@@ -87,7 +86,7 @@ class MapService {
         return [];
       }
 
-      final response = await query;
+      final response = await query.order('created_at', ascending: false);
 
       final data = response as List<dynamic>;
       return data.map((e) => e['image_url'] as String).toList();
