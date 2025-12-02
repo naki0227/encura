@@ -68,21 +68,21 @@
 
 ```mermaid
 graph TD
-    User[📱 User App (Flutter)]
+    User["📱 User App (Flutter)"]
     
     subgraph "Cloud Infrastructure (Supabase)"
-        DB[(PostgreSQL)]
-        Storage[Bucket: venue_maps]
-        Auth[Authentication]
+        DB[("PostgreSQL")]
+        Storage["Bucket: venue_maps"]
+        Auth["Authentication"]
     end
     
     subgraph "AI Services (Google)"
-        Gemini[✨ Gemini 2.5 Flash/Pro]
+        Gemini["✨ Gemini 2.5 Flash/Pro"]
     end
     
     subgraph "Automation (GitHub)"
-        Crawler[🤖 Python Crawler]
-        Actions[GitHub Actions (Cron)]
+        Crawler["🤖 Python Crawler"]
+        Actions["GitHub Actions (Cron)"]
     end
 
     %% Flows
