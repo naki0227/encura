@@ -6,6 +6,7 @@ import 'package:encura/core/repositories/daily_column_repository.dart';
 import 'package:encura/core/models/daily_column.dart';
 import 'package:encura/core/repositories/trending_repository.dart';
 import 'package:encura/core/models/trending_article.dart';
+import 'package:encura/ui/screens/venue/venue_search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -121,6 +122,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     pinned: true,
                     stretch: true,
                     backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                    actions: [
+                      IconButton(
+                        icon: const Icon(Icons.search, color: Colors.white),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const VenueSearchScreen()),
+                          );
+                        },
+                      ),
+                    ],
                     flexibleSpace: FlexibleSpaceBar(
                       stretchModes: const [
                         StretchMode.zoomBackground,

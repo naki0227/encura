@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:encura/ui/screens/venue/venue_detail_screen.dart';
 
 class VenueSearchScreen extends StatefulWidget {
   const VenueSearchScreen({super.key});
@@ -147,14 +148,10 @@ class _VenueSearchScreenState extends State<VenueSearchScreen> {
                       subtitle: Text(venue['address'] ?? 'No address info'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () {
-                        // Navigate to Venue Detail (or just show check-in dialog)
-                        // For now, maybe just show a simple dialog or placeholder
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: Text(venue['name']),
-                            content: const Text("Check-in and map features coming soon for direct venue access."),
-                            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK"))],
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => VenueDetailScreen(venue: venue),
                           ),
                         );
                       },
@@ -164,3 +161,4 @@ class _VenueSearchScreenState extends State<VenueSearchScreen> {
     );
   }
 }
+

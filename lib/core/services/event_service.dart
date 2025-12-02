@@ -90,4 +90,19 @@ class EventService {
       return [];
     }
   }
+
+  Future<List<ArtEvent>> getEventsByVenue(String venueId) async {
+    try {
+      final response = await _client
+          .from('events')
+          .select('id, title, venue, venue_id, location, description_json, source_url, start_date, end_date')
+          .eq('venue_id', venueId);
+      
+      final List<dynamic> data = response as List<dynamic>;
+      return data.map((e) => ArtEvent.fromJson(e)).toList();
+    } catch (e) {
+      // debugPrint('Error fetching events by venue: $e');
+      return [];
+    }
+  }
 }
