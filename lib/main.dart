@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'core/services/supabase_service.dart';
 import 'ui/screens/home/home_screen.dart';
@@ -61,6 +63,8 @@ class EnCuraApp extends StatelessWidget {
   }
 }
 
+
+
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -71,10 +75,77 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   
-  static const List<Widget> _screens = <Widget>[
+  static const List<Widget> _screens = [
     HomeScreen(),
     ChatScreen(),
+    // EventMapScreen(), // Temporarily disabled or moved
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFirstTime();
+  }
+
+  Future<void> _checkFirstTime() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasAgreed = prefs.getBool('has_agreed_to_terms') ?? false;
+
+    if (!hasAgreed && mounted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showAgreementDialog(prefs);
+      });
+    }
+  }
+
+  void _showAgreementDialog(SharedPreferences prefs) {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Prevent closing without agreement
+      builder: (context) => AlertDialog(
+        title: const Text('AI解説と投稿に関する注意事項'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('本アプリを利用する前に、以下の注意事項に同意してください。'),
+              SizedBox(height: 16),
+              Text('・本アプリの解説はAIによって生成されており、正確性を保証するものではありません。'),
+              SizedBox(height: 12),
+              Text('・マップ投稿機能では、ご自身が撮影した画像、または共有の許可を得ている画像のみを投稿してください。'),
+              SizedBox(height: 12),
+              Text('・違法な画像や不適切なコンテンツは予告なく削除される場合があります。'),
+              SizedBox(height: 24),
+              Text('利用規約とプライバシーポリシー', style: TextStyle(fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
+              InkWell(
+                child: Text(
+                  '利用規約・プライバシーポリシーを確認する',
+                  style: TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
+                ),
+                onTap: () async {
+                  final Uri url = Uri.parse('https://garrulous-court-1b7.notion.site/EnCura-2bda7052569880f1a124c2b45d0b4c9b?source=copy_link');
+                  if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+                    debugPrint('Could not launch $url');
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () async {
+              await prefs.setBool('has_agreed_to_terms', true);
+              if (mounted) Navigator.pop(context);
+            },
+            child: const Text('同意して利用を開始'),
+          ),
+        ],
+      ),
+    );
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -86,19 +157,21 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: _onItemTapped,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
             label: 'Home',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat),
-            label: 'Chat',
+          NavigationDestination(
+            icon: Icon(Icons.chat_bubble_outline),
+            selectedIcon: Icon(Icons.chat_bubble),
+            label: 'Curator',
           ),
         ],
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
       ),
     );
   }

@@ -59,8 +59,38 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
     }
   }
 
-  Future<void> _scanAndUploadMap() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+  Future<void> _showImageSourceSelection() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Camera'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _uploadMap(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _uploadMap(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _uploadMap(ImageSource source) async {
+    final XFile? image = await _picker.pickImage(source: source);
     if (image == null) return;
 
     if (!mounted) return;
@@ -176,7 +206,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                     style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   TextButton.icon(
-                    onPressed: _scanAndUploadMap,
+                    onPressed: _showImageSourceSelection,
                     icon: const Icon(Icons.add_a_photo),
                     label: const Text('Add Map'),
                   ),
@@ -191,7 +221,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                 margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: theme.cardColor.withOpacity(0.5),
+                  color: theme.cardColor.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: theme.dividerColor),
                 ),
@@ -211,7 +241,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
-                        onPressed: _scanAndUploadMap,
+                        onPressed: _showImageSourceSelection,
                         icon: const Icon(Icons.camera_alt),
                         label: const Text('Scan Venue Map'),
                         style: ElevatedButton.styleFrom(
@@ -242,7 +272,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
+                            color: Colors.black.withValues(alpha: 0.2),
                             blurRadius: 8,
                             offset: const Offset(0, 4),
                           ),
@@ -277,7 +307,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                               gradient: LinearGradient(
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
-                                colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+                                colors: [Colors.transparent, Colors.black.withValues(alpha: 0.7)],
                               ),
                             ),
                             padding: const EdgeInsets.all(12),
@@ -347,6 +377,29 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                 },
               ),
               
+            // Hotel Search Button
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    final url = 'https://search.travel.rakuten.co.jp/ds/search/mall?f_query=${Uri.encodeComponent(venueName)}';
+                    _launchUrl(url);
+                  },
+                  icon: const Icon(Icons.hotel, color: Color(0xFFC5A059)),
+                  label: const Text(
+                    '近くのホテル・宿を探す',
+                    style: TextStyle(color: Color(0xFFC5A059), fontWeight: FontWeight.bold),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFC5A059)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ),
+
             const SizedBox(height: 40),
           ],
         ),

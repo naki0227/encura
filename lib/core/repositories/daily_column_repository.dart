@@ -37,4 +37,32 @@ class DailyColumnRepository {
       return null;
     }
   }
+  Future<List<DailyColumn>> searchColumns({
+    String? query,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    try {
+      final now = DateTime.now();
+      final todayStr = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
+      var queryBuilder = _client
+          .from('daily_columns')
+          .select()
+          .lte('display_date', todayStr);
+
+      if (query != null && query.isNotEmpty) {
+        queryBuilder = queryBuilder.or('title.ilike.%$query%,content.ilike.%$query%,artist.ilike.%$query%');
+      }
+
+      final response = await queryBuilder
+          .order('display_date', ascending: false)
+          .range(offset, offset + limit - 1);
+      final List<dynamic> data = response as List<dynamic>;
+      return data.map((e) => DailyColumn.fromJson(e)).toList();
+    } catch (e) {
+      // debugPrint('Error searching columns: $e');
+      return [];
+    }
+  }
 }

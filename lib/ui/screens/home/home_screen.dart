@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:encura/core/repositories/event_repository.dart';
 import 'package:encura/core/services/event_service.dart';
 import '../event/event_detail_screen.dart';
@@ -7,6 +8,9 @@ import 'package:encura/core/models/daily_column.dart';
 import 'package:encura/core/repositories/trending_repository.dart';
 import 'package:encura/core/models/trending_article.dart';
 import 'package:encura/ui/screens/venue/venue_search_screen.dart';
+import 'package:encura/ui/screens/settings/settings_screen.dart';
+import 'package:encura/ui/screens/archive/archive_screen.dart';
+import 'package:encura/ui/widgets/daily_art_detail_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -49,29 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showColumnDetails(DailyColumn column) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(column.title),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (column.imageUrl.isNotEmpty)
-                Image.network(column.imageUrl),
-              const SizedBox(height: 8),
-              Text('Artist: ${column.artistName}', style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              Text(column.content),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+      builder: (context) => DailyArtDetailDialog(column: column),
     );
   }
 
@@ -106,6 +88,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  String _sanitizeUrl(String url) {
+    String cleanUrl = url.trim();
+    // Check for non-ASCII characters (e.g. Japanese)
+    if (cleanUrl.contains(RegExp(r'[^\x00-\x7F]'))) {
+      cleanUrl = Uri.encodeFull(cleanUrl);
+    }
+    return cleanUrl;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -122,6 +113,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     pinned: true,
                     stretch: true,
                     backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+
+
                     actions: [
                       IconButton(
                         icon: const Icon(Icons.search, color: Colors.white),
@@ -132,6 +125,24 @@ class _HomeScreenState extends State<HomeScreen> {
                           );
                         },
                       ),
+                        IconButton(
+                          icon: const Icon(Icons.history, color: Colors.white),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const ArchiveScreen(initialIndex: 0)),
+                            );
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.settings, color: Colors.white),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                            );
+                          },
+                        ),
                     ],
                     flexibleSpace: FlexibleSpaceBar(
                       stretchModes: const [
@@ -141,13 +152,17 @@ class _HomeScreenState extends State<HomeScreen> {
                       background: Stack(
                         fit: StackFit.expand,
                         children: [
-                          Image.network(
-                            _dailyColumn!.imageUrl,
+                          CachedNetworkImage(
+                            imageUrl: _sanitizeUrl(_dailyColumn!.imageUrl),
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Container(
-                              color: Colors.grey[900],
-                              child: const Center(child: Icon(Icons.broken_image, color: Colors.white54)),
-                            ),
+                            placeholder: (context, url) => Container(color: Colors.grey[900]),
+                            errorWidget: (context, url, error) {
+                              debugPrint('Today\'s Art Image load error: $error. URL: $url');
+                              return Container(
+                                color: Colors.grey[900],
+                                child: const Center(child: Icon(Icons.broken_image, color: Colors.white54)),
+                              );
+                            },
                           ),
                           const DecoratedBox(
                             decoration: BoxDecoration(
@@ -282,14 +297,23 @@ class _HomeScreenState extends State<HomeScreen> {
                                             child: Stack(
                                               fit: StackFit.expand,
                                               children: [
-                                                Image.network(
-                                                  article.imageUrl,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (context, error, stackTrace) => Container(
-                                                    color: Colors.grey[800],
-                                                    child: const Center(child: Icon(Icons.broken_image)),
-                                                  ),
-                                                ),
+                                                article.imageUrl.isNotEmpty
+                                                    ? CachedNetworkImage(
+                                                        imageUrl: _sanitizeUrl(article.imageUrl),
+                                                        fit: BoxFit.cover,
+                                                        placeholder: (context, url) => Container(color: Colors.grey[800]),
+                                                        errorWidget: (context, url, error) {
+                                                          debugPrint('Trending Topic Image load error: $error. URL: $url');
+                                                          return Container(
+                                                            color: Colors.grey[800],
+                                                            child: const Center(child: Icon(Icons.broken_image, color: Colors.white54)),
+                                                          );
+                                                        },
+                                                      )
+                                                    : Container(
+                                                        color: Colors.grey[800],
+                                                        child: const Center(child: Icon(Icons.image_not_supported, color: Colors.white54)),
+                                                      ),
                                                 Positioned(
                                                   top: 8,
                                                   right: 8,

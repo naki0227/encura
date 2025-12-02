@@ -21,11 +21,20 @@ dependencies:
   geolocator: ^13.0.1
   google_fonts: ^6.1.0
   url_launcher: ^6.3.2
+  shared_preferences: ^2.2.2
+  package_info_plus: ^8.0.0
+  cached_network_image: ^3.4.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.14.2
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon.png"
+  min_sdk_android: 21
 
 flutter:
   uses-material-design: true

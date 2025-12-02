@@ -64,7 +64,7 @@ class _VenueSearchScreenState extends State<VenueSearchScreen> {
         }
       }
 
-      final position = await Geolocator.getCurrentPosition();
+      // final position = await Geolocator.getCurrentPosition();
       
       // Use RPC for nearby search if available, or just client-side sort for now (simple MVP)
       // Ideally: .rpc('nearby_venues', params: {'lat': position.latitude, 'long': position.longitude})

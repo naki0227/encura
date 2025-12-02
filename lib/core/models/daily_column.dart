@@ -5,6 +5,7 @@ class DailyColumn {
   final String imageUrl;
   final String content;
   final DateTime displayDate;
+  final String? affiliateUrl;
 
   DailyColumn({
     required this.id,
@@ -13,6 +14,7 @@ class DailyColumn {
     required this.imageUrl,
     required this.content,
     required this.displayDate,
+    this.affiliateUrl,
   });
 
   factory DailyColumn.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class DailyColumn {
       imageUrl: json['image_url'],
       content: json['content'],
       displayDate: DateTime.parse(json['display_date']),
+      affiliateUrl: json['affiliate_url'],
     );
   }
 }
