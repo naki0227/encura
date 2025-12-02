@@ -54,6 +54,14 @@ Project Name: EnCura (エンキュラ) Subtitle: Your Pocket AI Curator / ポケ
 
 * 概要: 毎日更新の「今日の一枚」。季節や画家の誕生日をトリガーに自動生成。アフィリエイト導線を含む。
 
+3.6. [New] AI Map Memory
+* 概要: ユーザーがスキャンした館内図をAIが検証し、自動的に共有データベースに蓄積する機能。
+* 仕組み:
+    * ユーザーが画像をスキャン。
+    * Geminiが「これは地図か？」を判定。
+    * 地図であれば自動的にSupabase Storageにアップロードし、`venue_maps`テーブルに登録。
+    * 他のユーザーもその地図を参照・チャットで利用可能になる。
+
 4. データベース設計 (Schema for Supabase)
 
 Antigravityのエージェントに実装させるためのSQL定義概略。

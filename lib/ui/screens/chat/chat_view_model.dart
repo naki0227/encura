@@ -23,6 +23,41 @@ class ChatViewModel extends ChangeNotifier {
   List<ChatMessage> get messages => _messages;
   bool get isLoading => _isLoading;
 
+  Future<void> initialize(String? initialImageUrl) async {
+    if (initialImageUrl != null) {
+      // Simulate sending the image
+      _messages.add(ChatMessage(
+        text: 'Sent a map',
+        isUser: true,
+        // We don't have bytes here easily without downloading, so we might need to adjust ChatMessage or just show text
+        // For now, let's just start the conversation context
+      ));
+      _isLoading = true;
+      notifyListeners();
+
+      try {
+        // We need to fetch the image bytes if we want to send it to Gemini
+        // Or we can just send the URL if Gemini supports it (it doesn't directly via this SDK usually, needs bytes)
+        // For simplicity, let's assume we just ask a question about the map context, 
+        // but ideally we should download the image bytes from the URL.
+        
+        // TODO: Implement downloading image bytes from URL to send to Gemini
+        // For now, we will just send a text prompt saying we are looking at a map.
+        // Real implementation would require downloading the image.
+        
+        final response = await _chatService.sendMessage(
+          'I am looking at this venue map: $initialImageUrl. Please help me navigate.',
+        );
+        _messages.add(ChatMessage(text: response, isUser: false));
+      } catch (e) {
+        _messages.add(ChatMessage(text: 'Error loading map context: $e', isUser: false));
+      } finally {
+        _isLoading = false;
+        notifyListeners();
+      }
+    }
+  }
+
   Future<void> sendMessage(String text) async {
     if (text.trim().isEmpty) return;
 

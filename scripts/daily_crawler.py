@@ -54,24 +54,43 @@ def main():
     # 3. Upsert to Supabase
     for event in events:
         try:
-            # We want to upsert based on title and venue to avoid duplicates.
-            # Since we might not have a unique constraint on (title, venue) in the DB,
-            # we'll check if it exists first.
+            # --- Venue Handling ---
+            venue_name = event['venue']
+            venue_id = None
             
-            existing = supabase.table('events').select('id').eq('title', event['title']).eq('venue', event['venue']).execute()
+            # Check if venue exists
+            existing_venue = supabase.table('venues').select('id').eq('name', venue_name).execute()
+            
+            if existing_venue.data and len(existing_venue.data) > 0:
+                venue_id = existing_venue.data[0]['id']
+                print(f"Found existing venue: {venue_name} ({venue_id})")
+            else:
+                # Insert new venue
+                print(f"Inserting new venue: {venue_name}")
+                new_venue = supabase.table('venues').insert({
+                    'name': venue_name,
+                    # 'address': ... # Gemini prompt doesn't ask for address yet, could add later
+                }).execute()
+                if new_venue.data:
+                    venue_id = new_venue.data[0]['id']
+            
+            # --- Event Handling ---
+            # We want to upsert based on title and venue to avoid duplicates.
+            
+            existing_event = supabase.table('events').select('id').eq('title', event['title']).eq('venue', event['venue']).execute()
             
             data = {
                 "title": event['title'],
                 "venue": event['venue'],
+                "venue_id": venue_id, # Link to venue
                 "start_date": event['start_date'],
                 "end_date": event['end_date'],
                 "description_json": json.loads(event['description_json']) if isinstance(event['description_json'], str) else event['description_json'],
-                # "source_url": ... # Gemini doesn't always provide reliable URLs unless asked, user prompt didn't ask for it.
             }
 
-            if existing.data and len(existing.data) > 0:
+            if existing_event.data and len(existing_event.data) > 0:
                 # Update
-                event_id = existing.data[0]['id']
+                event_id = existing_event.data[0]['id']
                 print(f"Updating event: {event['title']}")
                 supabase.table('events').update(data).eq('id', event_id).execute()
             else:

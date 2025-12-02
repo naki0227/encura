@@ -9,7 +9,7 @@ class EventRepository {
     try {
       final response = await _client
           .from('events')
-          .select('id, title, venue, location, description_json, source_url');
+          .select('id, title, venue, location, description_json, source_url, start_date, end_date');
       
       final List<dynamic> data = response as List<dynamic>;
       return data.map((e) => ArtEvent.fromJson(e)).toList();

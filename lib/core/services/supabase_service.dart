@@ -13,4 +13,16 @@ class SupabaseService {
   }
 
   static SupabaseClient get client => Supabase.instance.client;
+
+  static Future<void> signInAnonymously() async {
+    final session = client.auth.currentSession;
+    if (session == null) {
+      try {
+        await client.auth.signInAnonymously();
+      } catch (e) {
+        // Handle error or log it
+        // debugPrint('Error signing in anonymously: $e');
+      }
+    }
+  }
 }

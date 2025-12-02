@@ -5,17 +5,23 @@ class ArtEvent {
   final String id;
   final String title;
   final String venue;
+  final String? venueId;
   final LatLng location;
   final String? summary;
   final String? sourceUrl;
+  final DateTime startDate;
+  final DateTime endDate;
 
   ArtEvent({
     required this.id,
     required this.title,
     required this.venue,
+    this.venueId,
     required this.location,
     this.summary,
     this.sourceUrl,
+    required this.startDate,
+    required this.endDate,
   });
 
   factory ArtEvent.fromJson(Map<String, dynamic> json) {
@@ -54,9 +60,12 @@ class ArtEvent {
       id: json['id'],
       title: json['title'],
       venue: json['venue'] ?? '',
+      venueId: json['venue_id'],
       location: LatLng(lat, lon),
       summary: json['description_json']?['summary'],
       sourceUrl: json['source_url'],
+      startDate: json['start_date'] != null ? DateTime.parse(json['start_date']) : DateTime.now(),
+      endDate: json['end_date'] != null ? DateTime.parse(json['end_date']) : DateTime.now(),
     );
   }
 }
@@ -69,7 +78,7 @@ class EventService {
       // We need to cast location to text to parse it easily in Dart
       final response = await _client
           .from('events')
-          .select('id, title, venue, location, description_json, source_url');
+          .select('id, title, venue, venue_id, location, description_json, source_url, start_date, end_date');
       
       // Note: PostGIS columns often return as WKT string in Supabase if not cast to GeoJSON.
       // Let's see what happens. If it fails, we might need to adjust.
