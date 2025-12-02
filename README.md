@@ -10,10 +10,10 @@
 </p>
 
 <p align="center">
-  <img src="screenshots/home.png" width="200" alt="EnCura Home" />
-  <img src="screenshots/vision.png" width="200" alt="EnCura Vision" />
-  <img src="screenshots/chat.png" width="200" alt="EnCura Chat" />
-  <img src="screenshots/map.png" width="200" alt="EnCura Map" />
+  <img src="assets/screenshots/home.png" width="200" alt="EnCura Home" />
+  <img src="assets/screenshots/vision.png" width="200" alt="EnCura Vision" />
+  <img src="assets/screenshots/chat.png" width="200" alt="EnCura Chat" />
+  <img src="assets/screenshots/map.png" width="200" alt="EnCura Map" />
 </p>
 
 ---
