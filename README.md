@@ -105,7 +105,7 @@ Supabase Account
 
 Google AI Studio API Key
 
-###2. Environment Variables
+### 2. Environment Variables
 ルートディレクトリに .env ファイルを作成してください。
 
 Bash
