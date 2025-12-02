@@ -125,7 +125,7 @@ Enludus (Information Science Student)
 
 Focus: AI-Native App Development, Game Creation
 
-Contact: [Your Email or Portfolio Link]
+Contact: nakinakipal@gmail.com / <https://enludus.vercel.com>
 
 <p align="center"> 
     © 2025 Enludus. All rights reserved. 
