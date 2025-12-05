@@ -76,9 +76,12 @@ class EventService {
   Future<List<ArtEvent>> getEvents() async {
     try {
       // We need to cast location to text to parse it easily in Dart
+      final today = DateTime.now().toIso8601String();
       final response = await _client
           .from('events')
-          .select('id, title, venue, venue_id, location, description_json, source_url, start_date, end_date');
+          .select('id, title, venue, venue_id, location, description_json, source_url, start_date, end_date')
+          .gte('end_date', today)
+          .order('start_date', ascending: true);
       
       // Note: PostGIS columns often return as WKT string in Supabase if not cast to GeoJSON.
       // Let's see what happens. If it fails, we might need to adjust.
@@ -93,10 +96,13 @@ class EventService {
 
   Future<List<ArtEvent>> getEventsByVenue(String venueId) async {
     try {
+      final today = DateTime.now().toIso8601String();
       final response = await _client
           .from('events')
           .select('id, title, venue, venue_id, location, description_json, source_url, start_date, end_date')
-          .eq('venue_id', venueId);
+          .eq('venue_id', venueId)
+          .gte('end_date', today)
+          .order('start_date', ascending: true);
       
       final List<dynamic> data = response as List<dynamic>;
       return data.map((e) => ArtEvent.fromJson(e)).toList();
