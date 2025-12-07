@@ -3,35 +3,45 @@ import json
 import datetime
 import google.generativeai as genai
 from supabase import create_client, Client
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def main():
     # 1. Configuration
     gemini_api_key = os.environ.get("GEMINI_API_KEY")
     supabase_url = os.environ.get("SUPABASE_URL")
-    supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
 
     if not gemini_api_key or not supabase_url or not supabase_key:
         print("Error: Missing environment variables.")
         return
+
+    if not os.environ.get("SUPABASE_SERVICE_ROLE_KEY"):
+        print("WARNING: SUPABASE_SERVICE_ROLE_KEY is missing. Using ANON KEY. Writes may fail due to RLS.")
+    else:
+        print("Using SUPABASE_SERVICE_ROLE_KEY.")
 
     genai.configure(api_key=gemini_api_key)
     supabase: Client = create_client(supabase_url, supabase_key)
 
     # 2. Prompt Gemini
     model = genai.GenerativeModel('gemini-2.5-flash')
-    prompt = """
-    現在、日本国内（東京・大阪中心）で開催中または開催予定の主要な美術展を20件ピックアップし、以下のJSON形式で出力してください。
+    today_str = datetime.date.today().isoformat()
+    prompt = f"""
+    現在（{today_str}時点）、日本国内（東京・大阪中心）で開催中または開催予定の主要な美術展を20件ピックアップし、以下のJSON形式で出力してください。
+    終了日が {today_str} 以降のものに限ります。
     JSON以外の余計なテキストは含めないでください。
 
     JSON形式:
     [
-      {
+      {{
         "title": "展覧会名",
         "venue": "会場名",
         "start_date": "YYYY-MM-DD",
         "end_date": "YYYY-MM-DD",
-        "description_json": "{\"summary\": \"展覧会の概要（100文字程度）\"}"
-      }
+        "description_json": "{{\\"summary\\": \\"展覧会の概要（100文字程度）\\"}}"
+      }}
     ]
     """
 
@@ -51,7 +61,17 @@ def main():
         print(f"Error fetching/parsing from Gemini: {e}")
         return
 
-    # 3. Upsert to Supabase
+    # 3. Cleanup Past Events
+    print("Cleaning up past events...")
+    try:
+        today_str = datetime.date.today().isoformat()
+        # Delete events where end_date is before today
+        supabase.table('events').delete().lt('end_date', today_str).execute()
+        print("Deleted past events.")
+    except Exception as e:
+        print(f"Error cleaning up events: {e}")
+
+    # 4. Upsert to Supabase
     for event in events:
         try:
             # --- Venue Handling ---
@@ -91,11 +111,11 @@ def main():
             if existing_event.data and len(existing_event.data) > 0:
                 # Update
                 event_id = existing_event.data[0]['id']
-                print(f"Updating event: {event['title']}")
+                print(f"Updating event: {event['title']} ({event['start_date']} ~ {event['end_date']})")
                 supabase.table('events').update(data).eq('id', event_id).execute()
             else:
                 # Insert
-                print(f"Inserting event: {event['title']}")
+                print(f"Inserting event: {event['title']} ({event['start_date']} ~ {event['end_date']})")
                 supabase.table('events').insert(data).execute()
                 
         except Exception as e:

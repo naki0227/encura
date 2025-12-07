@@ -76,7 +76,8 @@ class EventService {
   Future<List<ArtEvent>> getEvents() async {
     try {
       // We need to cast location to text to parse it easily in Dart
-      final today = DateTime.now().toIso8601String();
+      final now = DateTime.now();
+      final today = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
       final response = await _client
           .from('events')
           .select('id, title, venue, venue_id, location, description_json, source_url, start_date, end_date')
@@ -96,7 +97,8 @@ class EventService {
 
   Future<List<ArtEvent>> getEventsByVenue(String venueId) async {
     try {
-      final today = DateTime.now().toIso8601String();
+      final now = DateTime.now();
+      final today = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
       final response = await _client
           .from('events')
           .select('id, title, venue, venue_id, location, description_json, source_url, start_date, end_date')

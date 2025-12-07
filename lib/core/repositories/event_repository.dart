@@ -7,7 +7,8 @@ class EventRepository {
 
   Future<List<ArtEvent>> getEvents() async {
     try {
-      final today = DateTime.now().toIso8601String();
+      final now = DateTime.now();
+      final today = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
       final response = await _client
           .from('events')
           .select('id, title, venue, location, description_json, source_url, start_date, end_date')
