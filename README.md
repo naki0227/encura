@@ -60,7 +60,7 @@
 | **Database** | **PostgreSQL** | `PostGIS` (位置情報), `pgvector` (AI検索用) |
 | **AI Model** | **Google Gemini 2.5** | Flash (リアルタイム応答), Pro (バッチ処理) |
 | **DevOps** | **GitHub Actions** | 定期実行クローラー (Python), CI/CD |
-| **Design** | **Google Antigravity** | Agent-driven Developmentによる開発効率化 |
+| **Development** | **AI-Assisted** | Gemini 2.5のコード生成を活用し、**コアロジック（クローラーや位置情報処理）の実装に人間のリソースを集中** |
 
 ---
 
