@@ -111,12 +111,15 @@ Google AI Studio API Key
 Bash
 
 SUPABASE_URL=your_supabase_url
+
 SUPABASE_ANON_KEY=your_anon_key
+
 GEMINI_API_KEY=your_gemini_api_key
-3. Run
-Bash
+
+RunBash
 
 flutter pub get
+
 flutter run
 
 ---
@@ -125,7 +128,7 @@ Enludus (Information Science Student)
 
 Focus: AI-Native App Development, Game Creation
 
-Contact: nakinakipal@gmail.com / <https://enludus.vercel.app>
+Contact: [Email](nakinakipal@gmail.co) / [Home page](https://enludus.vercel.app)
 
 <p align="center"> 
     © 2025 Enludus. All rights reserved. 
