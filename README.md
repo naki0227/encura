@@ -57,6 +57,7 @@
 | :--- | :--- | :--- |
 | **Frontend** | **Flutter** (Dart) | クロスプラットフォーム開発 (iOS/Android) |
 | **Backend** | **Supabase** | BaaS (Auth, Database, Edge Functions, Storage) |
+| **Backend (Microservice)** | **Rust (Actix-web)** | 高負荷な画像処理（リサイズ・圧縮・プライバシー加工）を担当するCloud Runサービス |
 | **Database** | **PostgreSQL** | `PostGIS` (位置情報), `pgvector` (AI検索用) |
 | **AI Model** | **Google Gemini 2.5** | Flash (リアルタイム応答), Pro (バッチ処理) |
 | **DevOps** | **GitHub Actions** | 定期実行クローラー (Python), CI/CD |
@@ -76,6 +77,10 @@ graph TD
         Auth["Authentication"]
     end
     
+    subgraph "High Performance Service (Cloud Run)"
+        Rust["🦀 Rust Image Optimizer"]
+    end
+    
     subgraph "AI Services (Google)"
         Gemini["✨ Gemini 2.5 Flash/Pro"]
     end
@@ -86,7 +91,9 @@ graph TD
     end
 
     %% Flows
-    User -->|Chat / Image| Gemini
+    User -->|Chat| Gemini
+    User -->|Raw Image| Rust
+    Rust -->|Optimized Image| Gemini
     User -->|Read / Write| DB
     User -->|Upload Maps| Storage
     
@@ -94,6 +101,11 @@ graph TD
     Crawler -->|Fetch Info| Gemini
     Crawler -->|Upsert Data| DB
 ```
+
+### 🦀 Rust Microservice Strategy
+CPU負荷の高い画像処理（高画質写真のリサイズ・圧縮・顔認識モザイク処理）については、Flutterアプリ内や汎用サーバーではなく、**Rust (Actix-web)** による専用マイクロサービスとして切り出しています。
+これにより、**「爆速なレスポンス」** と **「メモリ安全性の担保」** を両立し、モバイルアプリのバッテリー消費や発熱も抑えています。
+
 ---
 ## 🚀 セットアップ (Getting Started)
 このリポジトリはポートフォリオ用です。実機で動作させるには以下の環境変数の設定が必要です。
