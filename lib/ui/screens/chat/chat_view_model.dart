@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/services/chat_service.dart';
+import '../../../core/services/image_optimizer_service.dart';
 
 class ChatMessage {
   final String text;
@@ -79,24 +80,27 @@ class ChatViewModel extends ChangeNotifier {
   Future<void> pickImageAndSend() async {
     try {
       final XFile? image = await _picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 80,
-    );
+        source: ImageSource.camera,
+        imageQuality: 100, // Send high quality to server for processing
+      );
       if (image == null) return;
 
       final imageBytes = await image.readAsBytes();
       
       _messages.add(ChatMessage(
-        text: 'Sent an image',
+        text: 'Analyzing...',
         isUser: true,
         imageBytes: imageBytes,
       ));
       _isLoading = true;
       notifyListeners();
 
+      // Optimize image using Rust Microservice
+      final optimizedBytes = await ImageOptimizerService.optimizeImage(imageBytes);
+
       final response = await _chatService.sendMessage(
         'Analyze this image and explain it as an art curator.',
-        imageBytes: imageBytes,
+        imageBytes: optimizedBytes.toList(), // Convert back to List<int>
       );
       
       _messages.add(ChatMessage(text: response, isUser: false));
