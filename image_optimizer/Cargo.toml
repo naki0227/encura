@@ -1,0 +1,13 @@
+[package]
+name = "image_optimizer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix-web = "4.9.0"
+actix-multipart = "0.6.1"
+image = "0.24.9"
+env_logger = "0.10.1"
+serde = { version = "1.0", features = ["derive"] }
+futures = "0.3"
+uuid = { version = "1.7", features = ["v4"] }
