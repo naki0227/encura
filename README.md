@@ -72,17 +72,39 @@
 ### 📂 ディレクトリ構成 (Directory Structure)
 モノレポ構成を採用し、フロントエンド・バックエンド・マイクロサービスを一元管理しています。
 
-├── app/                 # Flutter Application
-│   ├── lib/
-│   │   ├── features/    # 機能ごとの構成 (MVVM)
-│   │   └── shared/      # 共通ウィジェット・ロジック
-├── microservices/       # Rust Microservices
-│   ├── image_optimizer/ # Actix-web Server
-│   └── Cargo.toml
-├── supabase/            # Backend Definitions
-│   ├── migrations/      # SQL & Database Schema
-│   └── functions/       # Edge Functions (TypeScript)
-└── .github/             # CI/CD Workflows
+encura/
+├── .github/                 # CI/CD Workflows (Actions)
+│   └── workflows/           # Build, Test, Deploy definitions
+│
+├── app/                     # Mobile Application (Flutter)
+│   ├── assets/              # Static Assets (Images, Icons)
+│   └── lib/
+│       ├── core/            # 共通ユーティリティ・設定 (Env, Theme, Logger)
+│       ├── features/        # 機能単位の構成 (Feature-first Architecture)
+│       │   ├── art_guide/   # AI作品解説機能
+│       │   ├── map/         # 館内マップ・ナビゲーション機能
+│       │   └── chat/        # AI学芸員チャット機能
+│       │       ├── data/          # Repository & Data Source
+│       │       ├── domain/        # Entity & UseCase
+│       │       └── presentation/  # UI & State (Riverpod)
+│       └── main.dart
+│
+├── microservices/           # High-Performance Services
+│   └── rust_optimizer/      # 画像処理専用マイクロサービス (Rust/Actix-web)
+│       ├── src/
+│       ├── Cargo.toml
+│       └── Dockerfile
+│
+├── crawler/                 # Data Collection Bot
+│   ├── app/                 # 展覧会情報収集クローラー (Python)
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+└── supabase/                # Backend Infrastructure (BaaS)
+├── functions/           # Edge Functions (TypeScript/Deno)
+│   └── embed_vector/    # Gemini Embeddings生成用
+├── migrations/          # Database Schema & RLS Policies (SQL)
+└── seed.sql             # Initial Data
 
 ```mermaid
 graph TD
