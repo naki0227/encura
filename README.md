@@ -1,5 +1,7 @@
 # EnCura (エンキュラ) - AI Museum Guide 🏛️
 
+![Build Status](https://github.com/naki0227/encura/actions/workflows/ci.yml/badge.svg)
+
 <p align="center">
   <img src="assets/icon.png" width="120" alt="EnCura Logo" />
 </p>
@@ -67,6 +69,22 @@
 
 ## 🏗️ アーキテクチャ (Architecture)
 
+### 📂 ディレクトリ構成 (Directory Structure)
+モノレポ構成を採用し、フロントエンド・バックエンド・マイクロサービスを一元管理しています。
+
+.
+├── app/                 # Flutter Application
+│   ├── lib/
+│   │   ├── features/    # 機能ごとの構成 (MVVM)
+│   │   └── shared/      # 共通ウィジェット・ロジック
+├── microservices/       # Rust Microservices
+│   ├── image_optimizer/ # Actix-web Server
+│   └── Cargo.toml
+├── supabase/            # Backend Definitions
+│   ├── migrations/      # SQL & Database Schema
+│   └── functions/       # Edge Functions (TypeScript)
+└── .github/             # CI/CD Workflows
+
 ```mermaid
 graph TD
     User["📱 User App (Flutter)"]
@@ -105,8 +123,40 @@ graph TD
 ### 🦀 Rust Microservice Strategy
 CPU負荷の高い画像処理（高画質写真のリサイズ・圧縮・顔認識モザイク処理）については、Flutterアプリ内や汎用サーバーではなく、**Rust (Actix-web)** による専用マイクロサービスとして切り出しています。
 これにより、**「爆速なレスポンス」** と **「メモリ安全性の担保」** を両立し、モバイルアプリのバッテリー消費や発熱も抑えています。
+### 🗄 データベース設計 (Database Schema)
+Supabase (PostgreSQL) 上で、地理空間データ(PostGIS)とベクトルデータ(pgvector)を統合管理しています。
+
+```mermaid
+erDiagram
+    USERS ||--o{ REVIEWS : writes
+    USERS ||--o{ UPLOADED_MAPS : uploads
+    MUSEUMS ||--o{ EXHIBITIONS : hosts
+    MUSEUMS ||--o{ UPLOADED_MAPS : has
+    UPLOADED_MAPS {
+        uuid id PK
+        geography location "PostGIS座標"
+        string status "検証状況"
+    }
+    ARTWORKS ||--o{ VECTOR_EMBEDDINGS : has
+    VECTOR_EMBEDDINGS {
+        uuid id PK
+        vector embedding "Gemini解析結果(1536次元)"
+    }
 
 ---
+
+## 🧪 品質管理とテスト戦略 (Quality Assurance)
+スケーラビリティと保守性を担保するため、以下のテスト戦略を採用しています。
+
+| Layer | Technology | Scope |
+|:---|:---|:---|
+| **Unit Test** | `flutter_test` | ViewModel, Repository層のロジック検証 |
+| **Microservice** | `cargo test` | Rustによる画像処理ロジックの単体テスト |
+| **E2E** | Manual / Maestro | 実機でのUI動作確認 |
+| **CI** | GitHub Actions | PR作成時の自動ビルド・Lintチェック |
+
+---
+
 ## 🚀 セットアップ (Getting Started)
 このリポジトリはポートフォリオ用です。実機で動作させるには以下の環境変数の設定が必要です。
 
