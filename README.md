@@ -72,7 +72,6 @@
 ### 📂 ディレクトリ構成 (Directory Structure)
 モノレポ構成を採用し、フロントエンド・バックエンド・マイクロサービスを一元管理しています。
 
-.
 ├── app/                 # Flutter Application
 │   ├── lib/
 │   │   ├── features/    # 機能ごとの構成 (MVVM)
@@ -123,6 +122,7 @@ graph TD
 ### 🦀 Rust Microservice Strategy
 CPU負荷の高い画像処理（高画質写真のリサイズ・圧縮・顔認識モザイク処理）については、Flutterアプリ内や汎用サーバーではなく、**Rust (Actix-web)** による専用マイクロサービスとして切り出しています。
 これにより、**「爆速なレスポンス」** と **「メモリ安全性の担保」** を両立し、モバイルアプリのバッテリー消費や発熱も抑えています。
+
 ### 🗄 データベース設計 (Database Schema)
 Supabase (PostgreSQL) 上で、地理空間データ(PostGIS)とベクトルデータ(pgvector)を統合管理しています。
 
@@ -142,6 +142,7 @@ erDiagram
         uuid id PK
         vector embedding "Gemini解析結果(1536次元)"
     }
+```
 
 ---
 
