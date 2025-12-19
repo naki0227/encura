@@ -72,6 +72,7 @@
 ### 📂 ディレクトリ構成 (Directory Structure)
 モノレポ構成を採用し、フロントエンド・バックエンド・マイクロサービスを一元管理しています。
 
+```text
 encura/
 ├── .github/                 # CI/CD Workflows (Actions)
 │   └── workflows/           # Build, Test, Deploy definitions
@@ -101,10 +102,11 @@ encura/
 │   └── Dockerfile
 │
 └── supabase/                # Backend Infrastructure (BaaS)
-├── functions/           # Edge Functions (TypeScript/Deno)
-│   └── embed_vector/    # Gemini Embeddings生成用
-├── migrations/          # Database Schema & RLS Policies (SQL)
-└── seed.sql             # Initial Data
+    ├── functions/           # Edge Functions (TypeScript/Deno)
+    │   └── embed_vector/    # Gemini Embeddings生成用
+    ├── migrations/          # Database Schema & RLS Policies (SQL)
+    └── seed.sql             # Initial Data
+```
 
 ```mermaid
 graph TD
