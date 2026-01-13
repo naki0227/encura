@@ -1,5 +1,7 @@
 # EnCura (エンキュラ) - AI Museum Guide 🏛️
 
+![Build Status](https://github.com/naki0227/encura/actions/workflows/ci.yml/badge.svg)
+
 <p align="center">
   <img src="assets/icon.png" width="120" alt="EnCura Logo" />
 </p>
@@ -67,6 +69,45 @@
 
 ## 🏗️ アーキテクチャ (Architecture)
 
+### 📂 ディレクトリ構成 (Directory Structure)
+モノレポ構成を採用し、フロントエンド・バックエンド・マイクロサービスを一元管理しています。
+
+```text
+encura/
+├── .github/                 # CI/CD Workflows (Actions)
+│   └── workflows/           # Build, Test, Deploy definitions
+│
+├── app/                     # Mobile Application (Flutter)
+│   ├── assets/              # Static Assets (Images, Icons)
+│   └── lib/
+│       ├── core/            # 共通ユーティリティ・設定 (Env, Theme, Logger)
+│       ├── features/        # 機能単位の構成 (Feature-first Architecture)
+│       │   ├── art_guide/   # AI作品解説機能
+│       │   ├── map/         # 館内マップ・ナビゲーション機能
+│       │   └── chat/        # AI学芸員チャット機能
+│       │       ├── data/          # Repository & Data Source
+│       │       ├── domain/        # Entity & UseCase
+│       │       └── presentation/  # UI & State (Riverpod)
+│       └── main.dart
+│
+├── microservices/           # High-Performance Services
+│   └── rust_optimizer/      # 画像処理専用マイクロサービス (Rust/Actix-web)
+│       ├── src/
+│       ├── Cargo.toml
+│       └── Dockerfile
+│
+├── crawler/                 # Data Collection Bot
+│   ├── app/                 # 展覧会情報収集クローラー (Python)
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+└── supabase/                # Backend Infrastructure (BaaS)
+    ├── functions/           # Edge Functions (TypeScript/Deno)
+    │   └── embed_vector/    # Gemini Embeddings生成用
+    ├── migrations/          # Database Schema & RLS Policies (SQL)
+    └── seed.sql             # Initial Data
+```
+
 ```mermaid
 graph TD
     User["📱 User App (Flutter)"]
@@ -106,7 +147,41 @@ graph TD
 CPU負荷の高い画像処理（高画質写真のリサイズ・圧縮・顔認識モザイク処理）については、Flutterアプリ内や汎用サーバーではなく、**Rust (Actix-web)** による専用マイクロサービスとして切り出しています。
 これにより、**「爆速なレスポンス」** と **「メモリ安全性の担保」** を両立し、モバイルアプリのバッテリー消費や発熱も抑えています。
 
+### 🗄 データベース設計 (Database Schema)
+Supabase (PostgreSQL) 上で、地理空間データ(PostGIS)とベクトルデータ(pgvector)を統合管理しています。
+
+```mermaid
+erDiagram
+    USERS ||--o{ REVIEWS : writes
+    USERS ||--o{ UPLOADED_MAPS : uploads
+    MUSEUMS ||--o{ EXHIBITIONS : hosts
+    MUSEUMS ||--o{ UPLOADED_MAPS : has
+    UPLOADED_MAPS {
+        uuid id PK
+        geography location "PostGIS座標"
+        string status "検証状況"
+    }
+    ARTWORKS ||--o{ VECTOR_EMBEDDINGS : has
+    VECTOR_EMBEDDINGS {
+        uuid id PK
+        vector embedding "Gemini解析結果(1536次元)"
+    }
+```
+
 ---
+
+## 🧪 品質管理とテスト戦略 (Quality Assurance)
+スケーラビリティと保守性を担保するため、以下のテスト戦略を採用しています。
+
+| Layer | Technology | Scope |
+|:---|:---|:---|
+| **Unit Test** | `flutter_test` | ViewModel, Repository層のロジック検証 |
+| **Microservice** | `cargo test` | Rustによる画像処理ロジックの単体テスト |
+| **E2E** | Manual / Maestro | 実機でのUI動作確認 |
+| **CI** | GitHub Actions | PR作成時の自動ビルド・Lintチェック |
+
+---
+
 ## 🚀 セットアップ (Getting Started)
 このリポジトリはポートフォリオ用です。実機で動作させるには以下の環境変数の設定が必要です。
 
