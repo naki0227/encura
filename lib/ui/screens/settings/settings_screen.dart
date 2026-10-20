@@ -83,14 +83,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.description),
             title: const Text('利用規約'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => _launchUrl('https://garrulous-court-1b7.notion.site/EnCura-2bda7052569880f1a124c2b45d0b4c9b?source=copy_link'),
+            onTap: () => _launchUrl('https://enludus.com/products/encura-terms'),
           ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.privacy_tip),
             title: const Text('プライバシーポリシー'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => _launchUrl('https://garrulous-court-1b7.notion.site/EnCura-2bda7052569880f1a124c2b45d0b4c9b?source=copy_link'),
+            onTap: () => _launchUrl('https://enludus.com/products/encura-privacy'),
           ),
           const Divider(),
           ListTile(

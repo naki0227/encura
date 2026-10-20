@@ -3,10 +3,14 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Outcome of a map post. A network or storage error is not the same as the
+/// AI deciding the image is not a map, and the user should be told which.
+enum MapUploadResult { uploaded, notMap, failed }
+
 class MapService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  Future<bool> verifyAndUploadMap(File imageFile, String? eventId, String? venueId) async {
+  Future<MapUploadResult> verifyAndUploadMap(File imageFile, String? eventId, String? venueId) async {
     try {
       // 1. Verify with Gemini (via the curator Edge Function)
       final imageBytes = await imageFile.readAsBytes();
@@ -19,7 +23,7 @@ class MapService {
 
       if (!isMap) {
         debugPrint('Image rejected by AI: Not a map.');
-        return false;
+        return MapUploadResult.notMap;
       }
 
       // 2. Upload to Supabase Storage
@@ -43,10 +47,10 @@ class MapService {
         'is_verified': true,
       });
 
-      return true;
+      return MapUploadResult.uploaded;
     } catch (e) {
       debugPrint('Error in verifyAndUploadMap: $e');
-      return false;
+      return MapUploadResult.failed;
     }
   }
 

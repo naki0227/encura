@@ -65,21 +65,24 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     );
 
     final File imageFile = File(image.path);
-    final success = await _mapService.verifyAndUploadMap(imageFile, widget.event.id, widget.event.venueId);
+    final result = await _mapService.verifyAndUploadMap(imageFile, widget.event.id, widget.event.venueId);
 
     if (!mounted) return;
 
-    if (success) {
+    if (result == MapUploadResult.uploaded) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Map verified and uploaded!')),
       );
       _loadMaps(); // Refresh list
     } else {
+      final notMap = result == MapUploadResult.notMap;
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Not a Map'),
-          content: const Text('AI determined that this image is not a map or floor guide. Please try again.'),
+          title: Text(notMap ? 'Not a Map' : 'Upload Failed'),
+          content: Text(notMap
+              ? 'AI determined that this image is not a map or floor guide. Please try again.'
+              : 'Could not upload the map. Please check your connection and try again.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
