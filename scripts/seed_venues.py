@@ -1,85 +1,80 @@
-import os
-import json
-import google.generativeai as genai
-from supabase import create_client, Client
+#!/usr/bin/env python3
+"""Seed / repair the venues table (run by hand).
 
-def main():
-    # 1. Configuration
-    gemini_api_key = os.environ.get("GEMINI_API_KEY")
-    supabase_url = os.environ.get("SUPABASE_URL")
-    supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    python scripts/seed_venues.py [--dry-run]     add major museums
+    python scripts/seed_venues.py --relocate      recompute every venue's
+                                                  coordinates from its address
 
-    if not gemini_api_key or not supabase_url or not supabase_key:
-        print("Error: Missing environment variables.")
-        print("Please ensure GEMINI_API_KEY, SUPABASE_URL, and SUPABASE_SERVICE_ROLE_KEY are set.")
-        return
+Coordinates always come from the GSI address search. Earlier versions stored
+coordinates written by the model, which were often off by kilometres.
+"""
+from __future__ import annotations
 
-    genai.configure(api_key=gemini_api_key)
-    supabase: Client = create_client(supabase_url, supabase_key)
+import sys
 
-    # 2. Prompt Gemini
-    model = genai.GenerativeModel(os.environ.get("GEMINI_MODEL") or "gemini-3.8-flash")
-    prompt = """
-    日本国内（東京、大阪、京都、愛知、金沢など）の主要な美術館・博物館を30ヶ所リストアップしてください。
-    以下のJSON形式で出力してください。JSON以外の余計なテキストは含めないでください。
+from common import db, gemini, geo, web
 
-    JSON形式:
-    [
-      {
-        "name": "美術館名",
-        "address": "住所",
-        "lat": 35.1234,
-        "lon": 139.5678,
-        "website_url": "https://example.com"
-      }
-    ]
-    """
+SYSTEM = "あなたは美術館の情報を調べる編集者です。公式サイトで確認できた情報だけを答えます。"
 
-    print("Fetching venue data from Gemini...")
-    try:
-        response = model.generate_content(prompt)
-        text = response.text
-        # Clean up markdown code blocks if present
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0]
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0]
-        
-        venues = json.loads(text.strip())
-        print(f"Got {len(venues)} venues.")
-    except Exception as e:
-        print(f"Error fetching/parsing from Gemini: {e}")
-        return
+PROMPT = """日本国内の主要な美術館・博物館を、地域が偏らないように 30 館挙げてください。
+名称と住所は各館の公式サイトの表記どおりにします。
+JSON 配列だけを出力してください。
+[{"name": "館名", "address": "住所（都道府県から）", "website_url": "公式サイトの URL"}]"""
 
-    # 3. Upsert to Supabase
+
+def relocate(client, dry_run: bool) -> int:
+    venues = client.table("venues").select("id, name, address").execute().data
+    failed = 0
     for venue in venues:
-        try:
-            print(f"Processing: {venue['name']}")
-            
-            # Check if venue exists by name
-            existing_venue = supabase.table('venues').select('id').eq('name', venue['name']).execute()
-            
-            data = {
-                "name": venue['name'],
-                "address": venue['address'],
-                "location": f"POINT({venue['lon']} {venue['lat']})", # PostGIS format
-                "website_url": venue['website_url']
-            }
+        coords = geo.geocode(venue.get("address") or "")
+        if not coords:
+            print(f"- no coordinates: {venue['name']} ({venue.get('address')})")
+            failed += 1
+            continue
+        print(f"- {venue['name']}: {coords}")
+        if not dry_run:
+            location = geo.to_wkt(*coords)
+            client.table("venues").update({"location": location}).eq("id", venue["id"]).execute()
+            client.table("events").update({"location": location}).eq("venue_id", venue["id"]).execute()
+    return 1 if failed else 0
 
-            if existing_venue.data and len(existing_venue.data) > 0:
-                # Update
-                venue_id = existing_venue.data[0]['id']
-                print(f"  Updating existing venue (ID: {venue_id})")
-                supabase.table('venues').update(data).eq('id', venue_id).execute()
-            else:
-                # Insert
-                print(f"  Inserting new venue")
-                supabase.table('venues').insert(data).execute()
-                
-        except Exception as e:
-            print(f"Error upserting venue {venue.get('name')}: {e}")
 
-    print("Venue seeding completed.")
+def seed(client, dry_run: bool) -> int:
+    result = gemini.generate(PROMPT, system=SYSTEM, search=True)
+    items = gemini.extract_json(result.text)
+    existing = [] if dry_run else client.table("venues").select("id, name").execute().data
+    known = {web.normalize(v["name"]): v for v in existing}
+
+    for item in items if isinstance(items, list) else []:
+        name, address = str(item.get("name") or "").strip(), str(item.get("address") or "").strip()
+        url = str(item.get("website_url") or "").strip()
+        if not name or not address:
+            continue
+        page = web.fetch(url) if url else None
+        if not page or not web.mentions(page[1], name):
+            print(f"- skipped (official site does not confirm): {name}")
+            continue
+        coords = geo.geocode(address)
+        data = {"name": name, "address": address, "website_url": page[0]}
+        if coords:
+            data["location"] = geo.to_wkt(*coords)
+        match = known.get(web.normalize(name))
+        print(f"- {'update' if match else 'insert'}: {name} {coords or '(no coordinates)'}")
+        if dry_run:
+            continue
+        if match:
+            client.table("venues").update(data).eq("id", match["id"]).execute()
+        else:
+            client.table("venues").insert(data).execute()
+    return 0
+
+
+def main() -> int:
+    dry_run = "--dry-run" in sys.argv
+    if "--relocate" in sys.argv:
+        return relocate(db.client(), dry_run)
+    return seed(None if dry_run else db.client(), dry_run)
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

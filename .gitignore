@@ -52,3 +52,7 @@ config/*.json
 
 # Edge Function secrets for `supabase secrets set --env-file`
 supabase/.env*
+
+# Python
+__pycache__/
+.pytest_cache/

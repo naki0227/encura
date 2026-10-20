@@ -105,23 +105,19 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 
   Future<void> _launchMap() async {
-    // Try to launch with coordinates first
-    final Uri googleMapsUrl = Uri.parse(
-        'https://www.google.com/maps/search/?api=1&query=${widget.event.location.latitude},${widget.event.location.longitude}');
-    
-    if (await canLaunchUrl(googleMapsUrl)) {
-      await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
-    } else {
-      // Fallback to venue name search
-      final Uri venueSearchUrl = Uri.parse(
-          'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(widget.event.venue)}');
-      if (await canLaunchUrl(venueSearchUrl)) {
-        await launchUrl(venueSearchUrl, mode: LaunchMode.externalApplication);
-      } else {
-        // debugPrint('Could not launch map.');
-      }
+    // Use coordinates only when the event really has them; otherwise search
+    // by venue name rather than pointing at a default spot.
+    final location = widget.event.location;
+    final query = location != null
+        ? '${location.latitude},${location.longitude}'
+        : widget.event.venue;
+    final Uri url = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(query)}');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
     }
   }
+
 
   Future<void> _launchOfficialSite() async {
     if (widget.event.sourceUrl != null) {

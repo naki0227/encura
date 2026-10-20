@@ -1,174 +1,110 @@
-import os
-import json
-import datetime
-import urllib.request
-import urllib.parse
-import google.generativeai as genai
-from supabase import create_client, Client
+#!/usr/bin/env python3
+"""Today's Art (今日の一枚): keep the schedule filled ahead of time.
 
-def get_wikimedia_image_url(query):
-    if not query:
-        return ""
-    # Clean query
-    query = query.replace("File:", "").replace("_", " ")
-    # Remove extension if present
-    if "." in query:
-        query = query.rsplit(".", 1)[0]
-        
-    base_url = "https://commons.wikimedia.org/w/api.php"
-    params = {
-        "action": "query",
-        "generator": "search",
-        "gsrnamespace": "6", # File namespace
-        "gsrsearch": query,
-        "gsrlimit": "5", # Fetch more to filter out PDFs etc
-        "prop": "imageinfo",
-        "iiprop": "url|mime",
-        "iiurlwidth": "800", # Request thumbnail width
-        "format": "json"
-    }
-    url = f"{base_url}?{urllib.parse.urlencode(params)}"
-    try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'EnCura/1.0 (http://example.com/encura; support@example.com)'})
-        with urllib.request.urlopen(req) as response:
-            data = json.loads(response.read().decode())
-            pages = data.get("query", {}).get("pages", {})
-            
-            # Iterate through results to find a valid image
-            for page_id in pages:
-                image_info = pages[page_id].get("imageinfo", [])
-                if image_info:
-                    # Use thumburl if available, otherwise url
-                    file_url = image_info[0].get("thumburl", image_info[0]["url"])
-                    mime = image_info[0].get("mime", "")
-                    
-                    # Filter for valid image types
-                    if mime.startswith("image/") and not mime.endswith("tiff") and not mime.endswith("pdf"):
-                         # Double check extension just in case
-                         lower_url = file_url.lower()
-                         if lower_url.endswith(".jpg") or lower_url.endswith(".jpeg") or lower_url.endswith(".png") or lower_url.endswith(".webp"):
-                             return file_url
-    except Exception as e:
-        print(f"Error searching Wikimedia for '{query}': {e}")
-    return ""
+Fills every date from today to today + DAYS_AHEAD that has no entry yet.
+An artwork is used only when its image is found on Wikidata/Commons for that
+exact work by that artist; the text is written by Gemini with Google Search
+grounding.
 
-def main():
-    # ... (Configuration)
-    gemini_api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-    supabase_url = os.environ.get("SUPABASE_URL", "").strip()
-    supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    python scripts/seed_daily_art.py [--dry-run]
+"""
+from __future__ import annotations
 
-    if not gemini_api_key or not supabase_url or not supabase_key:
-        print("Error: Missing environment variables.")
-        return
+import datetime as dt
+import sys
 
-    genai.configure(api_key=gemini_api_key)
-    supabase: Client = create_client(supabase_url, supabase_key)
+from common import db, gemini, images, web
 
-    # 2. Fetch existing data and last date
-    print("Fetching existing data to avoid duplicates and determine start date...")
-    start_date = datetime.date.today() + datetime.timedelta(days=1)
-    existing_titles = []
-    
-    try:
-        # Fetch titles
-        existing_data = supabase.table('daily_columns').select('title').execute()
-        existing_titles = [item['title'] for item in existing_data.data]
-        print(f"Found {len(existing_titles)} existing art pieces.")
+DAYS_AHEAD = 14
 
-        # Fetch max date
-        # Note: Supabase/PostgREST doesn't support max() directly in select without rpc or complex query sometimes.
-        # We can order by display_date desc limit 1.
-        last_date_data = supabase.table('daily_columns').select('display_date').order('display_date', desc=True).limit(1).execute()
-        if last_date_data.data:
-            last_date_str = last_date_data.data[0]['display_date']
-            # Parse YYYY-MM-DD
-            last_date = datetime.datetime.strptime(last_date_str, "%Y-%m-%d").date()
-            if last_date >= datetime.date.today():
-                start_date = last_date + datetime.timedelta(days=1)
-                print(f"Found future schedule. Starting from {start_date}")
-    except Exception as e:
-        print(f"Error fetching existing data: {e}")
+SYSTEM = """あなたは美術館の学芸員です。作品の事実（作者、制作年、所蔵先、技法）は
+Google 検索で確認し、確認できないことは書きません。"""
 
-    exclusion_text = ""
-    if existing_titles:
-        exclusion_list = ", ".join(existing_titles)
-        exclusion_text = f"以下の作品は既に存在するため、絶対に生成しないでください: {exclusion_list}"
+PROMPT = """「今日の一枚」として紹介する絵画・版画を {count} 点選んでください。
+時代と地域（西洋、日本、東洋、近現代）が偏らないようにし、
+作者の没後 70 年以上たっていて画像が自由に使える作品に限ります。
+次の作品は既に紹介済みなので選ばないでください: {exclude}
 
-    # 3. Prompt Gemini
-    model = genai.GenerativeModel(os.environ.get("GEMINI_MODEL") or "gemini-3.8-flash")
-    prompt = f"""
-    西洋・日本を含む世界の名画を30作品選んでください。有名どころ（ゴッホ、モネ、北斎など）を中心に。
-    
-    {exclusion_text}
+各作品の content は、作品の背景と見どころを 200 字程度の日本語で書きます。
+確認した事実だけを書き、所蔵先がわかれば含めます。
 
-    各作品について、以下のJSON形式で出力してください。
-    JSON以外の余計なテキストは含めないでください。
+JSON 配列だけを出力してください。
+[
+  {{
+    "title": "日本語の作品名",
+    "title_en": "英語での作品名",
+    "artist": "日本語の作者名",
+    "artist_en": "英語での作者名",
+    "content": "解説"
+  }}
+]"""
 
-    JSON形式:
-    [
-      {{
-        "title": "作品名",
-        "artist": "画家名",
-        "image_search_query": "Wikimedia Commonsで画像を検索するためのキーワード（例: The Starry Night Van Gogh）。",
-        "content": "なぜ名画なのかを解説する200文字程度の文章"
-      }}
-    ]
-    """
 
-    print("Fetching daily art data from Gemini...")
-    try:
-        response = model.generate_content(prompt)
-        text = response.text
-        # Clean up markdown code blocks if present
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0]
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0]
-        
-        arts = json.loads(text.strip())
-        print(f"Got {len(arts)} art pieces.")
-    except Exception as e:
-        print(f"Error fetching/parsing from Gemini: {e}")
-        return
+def missing_dates(existing: set[str], today: dt.date, days: int = DAYS_AHEAD) -> list[dt.date]:
+    return [d for d in (today + dt.timedelta(n) for n in range(days + 1)) if d.isoformat() not in existing]
 
-    # 4. Upsert to Supabase
-    
-    for i, art in enumerate(arts):
-        try:
-            display_date = start_date + datetime.timedelta(days=i)
-            print(f"Processing: {art['title']} for {display_date}")
-            
-            # Check duplicate title locally
-            if art['title'] in existing_titles:
-                print(f"Skipping duplicate: {art['title']}")
-                continue
 
-            # Search Wikimedia for image URL
-            search_query = art.get('image_search_query', f"{art['title']} {art['artist']}")
-            image_url = get_wikimedia_image_url(search_query)
-            
-            if not image_url:
-                print(f"  - No image found for '{search_query}', trying title...")
-                image_url = get_wikimedia_image_url(art['title'])
+def valid_items(items, known_titles: set[str]) -> list[dict]:
+    out = []
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        if not all(str(item.get(k) or "").strip() for k in ("title", "artist", "content")):
+            continue
+        key = web.normalize(item["title"])
+        if key in known_titles:
+            continue
+        known_titles.add(key)
+        out.append(item)
+    return out
 
-            print(f"  - Image URL: {image_url}")
 
-            data = {
-                "title": art['title'],
-                "artist": art['artist'],
-                "image_url": image_url,
-                "content": art['content'],
-                "display_date": display_date.isoformat()
-            }
+def main(dry_run: bool = False) -> int:
+    today = dt.date.today()
+    client = None if dry_run else db.client()
+    rows = [] if dry_run else client.table("daily_columns").select("title, display_date").execute().data
+    dates = missing_dates({r["display_date"] for r in rows}, today)
+    if not dates:
+        print("Schedule is already filled.")
+        return 0
+    print(f"{len(dates)} dates to fill: {dates[0]} .. {dates[-1]}")
 
-            # Upsert based on display_date
-            supabase.table('daily_columns').upsert(data, on_conflict='display_date').execute()
-                
-        except Exception as e:
-            print(f"Error upserting daily art {art.get('title')}: {e}")
+    known = {web.normalize(r["title"]) for r in rows}
+    exclude = "、".join(r["title"] for r in rows[-200:]) or "なし"
+    # Ask for extra candidates: some will have no verifiable image.
+    result = gemini.generate(
+        PROMPT.format(count=len(dates) * 2, exclude=exclude), system=SYSTEM, search=True,
+    )
+    candidates = valid_items(gemini.extract_json(result.text), known)
+    print(f"Gemini ({result.model}) proposed {len(candidates)} new artworks.")
 
-    print("Daily art seeding completed.")
+    filled = 0
+    for item in candidates:
+        if filled == len(dates):
+            break
+        image_url = images.find_artwork_image(
+            [item.get("title_en", ""), item["title"]],
+            [item.get("artist_en", ""), item["artist"]],
+        )
+        if not image_url:
+            print(f"- skipped (no verified image): {item['title']} / {item['artist']}")
+            continue
+        date = dates[filled]
+        data = {
+            "title": item["title"],
+            "artist": item["artist"],
+            "image_url": image_url,
+            "content": item["content"],
+            "display_date": date.isoformat(),
+        }
+        print(f"- {date}: {item['title']} / {item['artist']}")
+        if not dry_run:
+            client.table("daily_columns").insert(data).execute()
+        filled += 1
+
+    print(f"Filled {filled} of {len(dates)} dates.")
+    return 0 if filled else 1
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main(dry_run="--dry-run" in sys.argv))

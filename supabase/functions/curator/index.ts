@@ -6,7 +6,8 @@
 //
 // Secrets (set with `supabase secrets set ...`, never commit the values):
 //   GEMINI_API_KEY  required
-//   GEMINI_MODEL    optional, defaults to DEFAULT_MODEL below
+//   GEMINI_MODEL    optional, comma separated; tried in order, so a retired
+//                   model falls through to the next. Defaults to DEFAULT_MODELS.
 //
 // Request body (JSON):
 //   { "task": "chat", "message": string, "history"?: Turn[], "image"?: base64 }
@@ -19,7 +20,7 @@
 //   error  -> { "error": string }
 
 const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
-const DEFAULT_MODEL = "gemini-3.8-flash";
+const DEFAULT_MODELS = ["gemini-3.8-flash", "gemini-3.6-flash"];
 
 // Keep the last 20 turns (user + model) as the spec says.
 const MAX_HISTORY_CONTENTS = 40;
@@ -80,27 +81,43 @@ function historyContents(history: unknown): Content[] {
     }));
 }
 
+function models(): string[] {
+  const configured = (Deno.env.get("GEMINI_MODEL") ?? "")
+    .split(",")
+    .map((m) => m.trim())
+    .filter((m) => m.length > 0);
+  return configured.length > 0 ? configured : DEFAULT_MODELS;
+}
+
 async function callGemini(payload: Record<string, unknown>): Promise<string> {
   const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
-  const model = Deno.env.get("GEMINI_MODEL") || DEFAULT_MODEL;
 
-  const res = await fetch(`${GEMINI_ENDPOINT}/${model}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    // Log the upstream error for the owner; do not echo it to the client.
-    console.error(`Gemini ${model} returned ${res.status}: ${await res.text()}`);
-    throw new Error(`Gemini request failed (${res.status})`);
+  for (const model of models()) {
+    const res = await fetch(`${GEMINI_ENDPOINT}/${model}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify(payload),
+    });
+    if (res.status === 404) {
+      // Model retired or renamed: try the next one.
+      console.error(`Gemini ${model} is not available (404)`);
+      continue;
+    }
+    if (!res.ok) {
+      // Log the upstream error for the owner; do not echo it to the client.
+      console.error(`Gemini ${model} returned ${res.status}: ${await res.text()}`);
+      throw new Error(`Gemini request failed (${res.status})`);
+    }
+    const data = await res.json();
+    const parts = data?.candidates?.[0]?.content?.parts ?? [];
+    return parts
+      .filter((p: { thought?: boolean }) => !p.thought)
+      .map((p: { text?: string }) => p.text ?? "")
+      .join("")
+      .trim();
   }
-  const data = await res.json();
-  const parts = data?.candidates?.[0]?.content?.parts ?? [];
-  return parts
-    .map((p: { text?: string }) => p.text ?? "")
-    .join("")
-    .trim();
+  throw new Error("No configured Gemini model is available");
 }
 
 async function chat(body: Record<string, unknown>): Promise<Response> {

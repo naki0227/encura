@@ -1,182 +1,128 @@
 #!/usr/bin/env python3
+"""Art news (トレンド): recent, sourced topics.
+
+Every article must come from a page found by Google Search that names the
+topic. Articles are written only from those sources; topics the model cannot
+source are dropped instead of being made up.
+
+    python scripts/trend_art_crawler.py [--dry-run]
 """
-Trend Art Crawler - SNSやニュースで話題の美術展・作品を自動収集
-"""
-import os
-import json
-from pathlib import Path
-from dotenv import load_dotenv
-import google.generativeai as genai
-from supabase import create_client, Client
+from __future__ import annotations
 
-# Load .env from project root
-env_path = Path(__file__).parent.parent / '.env'
-load_dotenv(env_path)
+import datetime as dt
+import sys
 
+from common import db, gemini, images, web
 
-def get_wikimedia_image_url(query):
-    """Wikimedia Commonsから画像URLを取得"""
-    import urllib.request
-    import urllib.parse
-    
-    if not query:
-        return ""
-    
-    query = query.replace("File:", "").replace("_", " ")
-    if "." in query:
-        query = query.rsplit(".", 1)[0]
-        
-    base_url = "https://commons.wikimedia.org/w/api.php"
-    params = {
-        "action": "query",
-        "generator": "search",
-        "gsrnamespace": "6",
-        "gsrsearch": query,
-        "gsrlimit": "5",
-        "prop": "imageinfo",
-        "iiprop": "url|mime",
-        "iiurlwidth": "800",
-        "format": "json"
-    }
-    url = f"{base_url}?{urllib.parse.urlencode(params)}"
-    
-    try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'EnCura/1.0'})
-        with urllib.request.urlopen(req) as response:
-            data = json.loads(response.read().decode())
-            pages = data.get("query", {}).get("pages", {})
-            
-            for page_id in pages:
-                image_info = pages[page_id].get("imageinfo", [])
-                if image_info:
-                    file_url = image_info[0].get("thumburl", image_info[0]["url"])
-                    mime = image_info[0].get("mime", "")
-                    
-                    if mime.startswith("image/") and not mime.endswith("tiff") and not mime.endswith("pdf"):
-                        lower_url = file_url.lower()
-                        if any(lower_url.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp"]):
-                            return file_url
-    except Exception as e:
-        print(f"Error searching Wikimedia for '{query}': {e}")
-    return ""
+KEYWORDS = ("展覧会", "新発見・修復", "美術館", "作品・作家")
+
+SYSTEM = """あなたは美術ニュースの編集者です。Google 検索で見つけた報道や公式発表に
+書かれている事実だけを使って記事を書きます。推測、誇張、出典のない数字は書きません。"""
+
+PROMPT = """今日は {today} です。過去 {days} 日間に日本語で報じられた、美術に関する話題を
+最大 5 件選んでください（大きな展覧会の発表や来場者数、作品の新発見・修復・返還、
+美術館の開館・リニューアル、作家の受賞など）。
+次の話題は既に記事にしたので除きます: {exclude}
+
+各話題について:
+- source_url: その話題を報じた記事か公式発表のページの URL
+- subject: 話題の中心の固有名詞（展覧会名・作品名・館名・作家名のどれか）を出典の表記どおりに
+- content: 出典に書かれている事実だけで 200〜300 字
+- artwork: 特定の作品が話題の中心なら、その作品の英語名と作者の英語名。なければ null
+- keyword: {keywords} のどれか
+
+JSON 配列だけを出力してください。
+[
+  {{
+    "title": "見出し（30 字以内、誇張しない）",
+    "summary": "50 字程度の要約",
+    "content": "本文",
+    "source_url": "https://...",
+    "subject": "固有名詞",
+    "keyword": "展覧会",
+    "artwork": {{"title_en": "...", "artist_en": "..."}}
+  }}
+]"""
+
+RECENT_DAYS = 14
 
 
-def main(dry_run=False):
-    # Configuration
-    gemini_api_key = os.environ.get("GEMINI_API_KEY", "").strip()
-    supabase_url = os.environ.get("SUPABASE_URL", "").strip()
-    supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+def valid_topics(items, known_titles: set[str], known_urls: set[str]) -> list[dict]:
+    out = []
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        if not all(str(item.get(k) or "").strip() for k in ("title", "summary", "content")):
+            continue
+        key = web.normalize(item["title"])
+        url = str(item.get("source_url") or "").strip()
+        if key in known_titles or (url and url in known_urls):
+            continue
+        if item.get("keyword") not in KEYWORDS:
+            item["keyword"] = "美術館"
+        known_titles.add(key)
+        out.append(item)
+    return out
 
-    if not gemini_api_key or not supabase_url or not supabase_key:
-        print("Error: Missing environment variables.")
-        return
 
-    genai.configure(api_key=gemini_api_key)
-    supabase: Client = create_client(supabase_url, supabase_key)
+def anchor_phrase(item: dict) -> str:
+    """The phrase a source page must contain.
 
-    # Fetch existing titles to avoid duplicates
-    print("Fetching existing articles to avoid duplicates...")
-    try:
-        existing_data = supabase.table('trending_articles').select('title').execute()
-        existing_titles = [item['title'] for item in existing_data.data]
-        print(f"Found {len(existing_titles)} existing articles.")
-    except Exception as e:
-        print(f"Error fetching existing articles: {e}")
-        existing_titles = []
-
-    exclusion_text = ""
-    if existing_titles:
-        exclusion_list = ", ".join(existing_titles[-50:])  # Last 50 to avoid huge prompt
-        exclusion_text = f"以下のトピックは既に存在するため、生成しないでください: {exclusion_list}"
-
-    # Prompt Gemini for trending art topics
-    model = genai.GenerativeModel(os.environ.get("GEMINI_MODEL") or "gemini-3.8-flash")
-    prompt = f"""
-    現在SNSやニュースで話題の美術展・作品・アートトピックを5件作成してください。
-    以下のカテゴリから幅広く選んでください：
-
-    1. 注目の展覧会（混雑情報、チケット完売、話題の理由など）
-    2. SNSでバズった作品・アーティスト
-    3. 美術ミステリー・トリビア（「実は怖い絵画」「隠された意味」など）
-    4. 新発見・修復完了・返還された作品
-    5. 季節に関連した作品（今の時期にぴったりの名画など）
-
-    {exclusion_text}
-
-    各トピックについて、以下のJSON形式で出力してください。
-    JSON以外の余計なテキストは含めないでください。
-
-    JSON形式:
-    [
-      {{
-        "title": "キャッチーなタイトル（【話題】などの接頭辞は不要）",
-        "summary": "興味を惹く短い概要（50文字程度）",
-        "content": "詳細な解説本文（200-300文字程度）",
-        "image_search_query": "Wikimedia Commonsで画像を検索するためのキーワード（英語推奨、例: The Last Supper Leonardo da Vinci）",
-        "keyword": "展覧会、SNS話題、ミステリー、修復、季節 のいずれか",
-        "source_url": "関連する公式サイトやニュースURL（わかる場合のみ、不明なら空文字）"
-      }}
-    ]
+    The headline is the model's own wording and rarely appears verbatim, so
+    the proper noun the story is about is checked instead.
     """
+    subject = str(item.get("subject") or "").strip()
+    return subject if len(web.normalize(subject)) >= 3 else item["title"]
 
-    print("Fetching trending art topics from Gemini...")
-    try:
-        response = model.generate_content(prompt)
-        text = response.text
-        
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0]
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0]
-        
-        topics = json.loads(text.strip())
-        print(f"Got {len(topics)} trending topics.")
-    except Exception as e:
-        print(f"Error fetching/parsing from Gemini: {e}")
-        return
 
-    # Insert to Supabase
-    for topic in topics:
-        try:
-            print(f"Processing: {topic['title']}")
-            
-            if topic['title'] in existing_titles:
-                print(f"  - Skipping duplicate: {topic['title']}")
-                continue
+def main(dry_run: bool = False) -> int:
+    today = dt.date.today()
+    client = None if dry_run else db.client()
+    rows = [] if dry_run else client.table("trending_articles").select("title, source_url").execute().data
+    known_titles = {web.normalize(r["title"]) for r in rows}
+    known_urls = {r["source_url"] for r in rows if r.get("source_url")}
 
-            # Get image from Wikimedia
-            search_query = topic.get('image_search_query', topic['title'])
-            image_url = get_wikimedia_image_url(search_query)
-            
-            if not image_url:
-                print(f"  - No image found for '{search_query}', trying title...")
-                image_url = get_wikimedia_image_url(topic['title'])
+    result = gemini.generate(
+        PROMPT.format(
+            today=today.isoformat(), days=RECENT_DAYS,
+            exclude="、".join(r["title"] for r in rows[-50:]) or "なし",
+            keywords="、".join(KEYWORDS),
+        ),
+        system=SYSTEM,
+        search=True,
+    )
+    topics = valid_topics(gemini.extract_json(result.text), known_titles, known_urls)
+    print(f"Gemini ({result.model}) proposed {len(topics)} new topics from {len(result.sources)} sources.")
+    source_urls = [s.uri for s in result.sources]
 
-            print(f"  - Image URL: {image_url[:50]}..." if image_url else "  - No image found")
+    stored = 0
+    for item in topics:
+        print(f"- {item['title']}")
+        verified = web.find_page_mentioning(anchor_phrase(item), [item.get("source_url", "")] + source_urls)
+        if not verified:
+            print("  skipped: no source page confirms this topic")
+            continue
+        art = item.get("artwork") or {}
+        image_url = ""
+        if art.get("title_en") and art.get("artist_en"):
+            image_url = images.find_artwork_image([art["title_en"]], [art["artist_en"]]) or ""
+        data = {
+            "title": item["title"],
+            "summary": item["summary"],
+            "content": item["content"],
+            "image_url": image_url,
+            "keyword": item["keyword"],
+            "source_url": verified,
+            "is_published": True,
+        }
+        print(f"  source: {verified}" + ("" if image_url else " (no image)"))
+        if not dry_run:
+            client.table("trending_articles").insert(data).execute()
+        stored += 1
 
-            data = {
-                "title": topic['title'],
-                "summary": topic['summary'],
-                "content": topic['content'],
-                "image_url": image_url,
-                "keyword": topic['keyword'],
-                "source_url": topic.get('source_url', ''),
-                "is_published": True
-            }
-
-            if dry_run:
-                print(f"  [DRY RUN] Would insert: {data['title']}")
-            else:
-                supabase.table('trending_articles').insert(data).execute()
-                print(f"  - Inserted successfully!")
-                
-        except Exception as e:
-            print(f"Error inserting topic {topic.get('title')}: {e}")
-
-    print("Trend art crawling completed.")
+    print(f"Stored {stored} sourced articles.")
+    return 0 if stored or not topics else 1
 
 
 if __name__ == "__main__":
-    import sys
-    dry_run = "--dry-run" in sys.argv
-    main(dry_run=dry_run)
+    sys.exit(main(dry_run="--dry-run" in sys.argv))
