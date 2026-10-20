@@ -97,7 +97,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: const Icon(Icons.mail),
             title: const Text('お問い合わせ'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => _launchUrl('mailto:nakinakipal@gmail.com'),
+            onTap: () => _launchUrl('mailto:contact@enludus.com'),
           ),
           const Divider(),
           ListTile(
