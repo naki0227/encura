@@ -274,6 +274,8 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                         image: DecorationImage(
                           image: NetworkImage(_maps[index]),
                           fit: BoxFit.cover,
+                          // A broken upload leaves the box empty instead of throwing.
+                          onError: (error, stackTrace) {},
                         ),
                         boxShadow: [
                           BoxShadow(

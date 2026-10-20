@@ -24,7 +24,7 @@ from typing import Callable
 
 import requests
 
-from common import gemini
+from common import gemini, images
 
 OK, WARN, FAIL, SKIP = "OK", "WARN", "FAIL", "SKIP"
 TIMEOUT = 60
@@ -141,6 +141,37 @@ def check_supabase_content(http: requests.Session) -> Check:
     return Check(name, OK, "reachable, content is current")
 
 
+@named('Supabase: content images')
+def check_content_images(http: requests.Session) -> Check:
+    """Images the app is showing now actually load (as stored, for old app versions too)."""
+    name = check_content_images.label
+    if not (env("SUPABASE_URL") and env("SUPABASE_ANON_KEY")):
+        return Check(name, SKIP, "SUPABASE_URL / SUPABASE_ANON_KEY not set")
+    base = env("SUPABASE_URL").rstrip("/") + "/rest/v1"
+    today = dt.date.today().isoformat()
+    queries = [
+        ("daily_columns", {"select": "title,image_url", "display_date": f"lte.{today}",
+                           "order": "display_date.desc", "limit": "7"}),
+        ("trending_articles", {"select": "title,image_url", "is_published": "eq.true",
+                               "order": "created_at.desc", "limit": "10"}),
+    ]
+    broken, checked = [], 0
+    for table, params in queries:
+        res = http.get(f"{base}/{table}", params=params, headers=_supabase_headers(), timeout=TIMEOUT)
+        if res.status_code != 200:
+            return Check(name, FAIL, f"{table}: HTTP {res.status_code}")
+        for row in res.json():
+            if not row.get("image_url"):
+                continue
+            checked += 1
+            if images.image_status(row["image_url"], http) == "broken":
+                broken.append(row["title"])
+    if broken:
+        return Check(name, WARN, f"{len(broken)}/{checked} images do not load: {', '.join(broken[:5])} "
+                                 "(run scripts/fix_image_urls.py --apply)")
+    return Check(name, OK, f"{checked} images load")
+
+
 @named('Edge Function: curator')
 def check_curator_function(http: requests.Session) -> Check:
     """End to end, the way the app does it: anonymous sign-in, then the function."""
@@ -191,6 +222,7 @@ CHECKS: list[Callable[[requests.Session], Check]] = [
     check_gemini_generate,
     check_gemini_search,
     check_supabase_content,
+    check_content_images,
     check_curator_function,
     check_image_optimizer,
 ]

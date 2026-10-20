@@ -83,6 +83,7 @@ App Store Connect API キーの作り方:
 | Gemini: generate | 生成が通らない |
 | Gemini: search grounding | Google 検索連携が使えない（クローラーが内容を確認できなくなる） |
 | Supabase: database and content | プロジェクトが止まった／今日の一枚・展覧会・ニュースが古い |
+| Supabase: content images | 表示中の画像が読み込めない（`fix_image_urls.py` を実行する） |
 | Edge Function: curator | アプリと同じ経路（匿名サインイン → 関数）で AI 学芸員が答えるか |
 | Image optimizer | 最適化サービスが画像を返すか（止まっていても警告だけ。アプリは元画像で動く） |
 
@@ -101,6 +102,12 @@ App Store Connect API キーの作り方:
    ```bash
    pip install -r scripts/requirements.txt
    SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... python scripts/seed_venues.py --relocate
+   ```
+5. 保存済みの画像 URL を直す（Wikimedia の配信幅の変更と、存在しない画像への対応）。まず確認だけをして、内容がよければ `--apply` で書き込みます。
+
+   ```bash
+   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... python scripts/fix_image_urls.py
+   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... python scripts/fix_image_urls.py --apply
    ```
 
 ## 7. TestFlight に上げる
@@ -140,6 +147,7 @@ App Store Connect API キーの作り方:
 ・画像処理サーバーにつながらないときも、作品スキャンを続けられるようにしました。
 ・展覧会・ニュースは、公式サイトなどの出典で確認できたものだけを載せるようにしました。
 ・展覧会の地図ボタンが正しい会場を開かないことがある問題を修正しました。
+・作品やニュースの画像が表示されないことがある問題を修正しました。
 ・AIとの通信をサーバー経由にし、安全性を高めました。
 
 ご不便をおかけし申し訳ありませんでした。ご意見・不具合のご報告は contact@enludus.com までお寄せください。

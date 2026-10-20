@@ -25,7 +25,7 @@ INSERT INTO trending_articles (title, summary, image_url, keyword, content, is_p
 VALUES (
     '【急上昇】なぜ今、「明治の超絶技巧」が熱いのか？',
     'SNSで話題の明治工芸。その精緻な技術は現代でも再現困難と言われています。',
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d0/Twelve_Bronze_Falcons_by_Suzuki_Chokichi.jpg/640px-Twelve_Bronze_Falcons_by_Suzuki_Chokichi.jpg',
+    '', -- the file this pointed to does not exist on Wikimedia Commons
     '超絶技巧',
     '最近、SNSで話題の「明治の工芸」。その精緻な技術は、現代の3Dプリンタですら再現不可能と言われています。特に注目すべきは正阿弥勝義や鈴木長吉といった作家たちです...',
     TRUE,

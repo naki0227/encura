@@ -37,3 +37,21 @@ def test_returns_none_instead_of_a_loose_match():
         ("wbsearchentities", FakeResponse(200, {"search": []})),
     ])
     assert images.find_artwork_image(["Untitled"], ["Claude Monet"], http) is None
+
+
+BASE = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Starry.jpg"
+
+
+def test_normalize_image_url_moves_to_allowed_width():
+    assert images.normalize_image_url(f"{BASE}/800px-Starry.jpg") == f"{BASE}/960px-Starry.jpg"
+    assert images.normalize_image_url(f"{BASE}/1024px-Starry.jpg?x=1") == f"{BASE}/1280px-Starry.jpg"
+    assert images.normalize_image_url(f"{BASE}/960px-Starry.jpg") == f"{BASE}/960px-Starry.jpg"
+    assert images.normalize_image_url("https://example.com/a.jpg") == "https://example.com/a.jpg"
+
+
+def test_image_status():
+    ok = FakeSession([("a.jpg", FakeResponse(200, "x", headers={"content-type": "image/jpeg"}))])
+    assert images.image_status("https://x/a.jpg", ok) == "ok"
+    html = FakeSession([("a.jpg", FakeResponse(400, "<html>Use thumbnail sizes</html>"))])
+    assert images.image_status("https://x/a.jpg", html) == "broken"
+    assert images.image_status("") == "broken"

@@ -19,6 +19,9 @@ class FakeResponse:
         self.raw = io.BytesIO(self.text.encode())
         self.raw.read = (lambda f: lambda n=-1, decode_content=True: f(n))(self.raw.read)
 
+    def close(self):
+        pass
+
     def json(self):
         return json.loads(self.text)
 

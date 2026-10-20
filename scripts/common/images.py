@@ -7,6 +7,7 @@ carries an image (P18). Commons only hosts freely licensed files.
 """
 from __future__ import annotations
 
+import re
 import time
 
 import requests
@@ -15,7 +16,47 @@ from .web import USER_AGENT, normalize
 
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 COMMONS_API = "https://commons.wikimedia.org/w/api.php"
-THUMB_WIDTH = 800
+# Wikimedia only serves these thumbnail widths; others get an HTML 400/429
+# page (https://www.mediawiki.org/wiki/Common_thumbnail_sizes).
+THUMB_WIDTHS = (20, 40, 60, 120, 250, 330, 500, 960, 1280, 1920, 3840)
+THUMB_WIDTH = 960
+
+_THUMB = re.compile(r"^(https://upload\.wikimedia\.org/wikipedia/[^?#]+/thumb/[^?#]+/)(\d+)px-([^/?#]+)")
+
+
+def normalize_image_url(url: str) -> str:
+    """Move a Wikimedia thumbnail URL to an allowed width (same rule as the app)."""
+    url = (url or "").strip()
+    match = _THUMB.match(url)
+    if not match:
+        return url
+    width = int(match.group(2))
+    if width in THUMB_WIDTHS:
+        return url
+    allowed = next((w for w in THUMB_WIDTHS if w >= width), THUMB_WIDTHS[-1])
+    return f"{match.group(1)}{allowed}px-{match.group(3)}"
+
+
+def image_status(url: str, session: requests.Session | None = None) -> str:
+    """'ok', 'broken', or 'unknown' (rate limited / network trouble)."""
+    if not url:
+        return "broken"
+    http = session or requests.Session()
+    for attempt in range(3):
+        try:
+            res = http.get(url, headers={"User-Agent": USER_AGENT}, timeout=20, stream=True)
+        except requests.RequestException:
+            return "unknown"
+        try:
+            if res.status_code == 429:
+                time.sleep(5 * (attempt + 1))
+                continue
+            if res.status_code == 200 and res.headers.get("content-type", "").startswith("image/"):
+                return "ok"
+            return "broken"
+        finally:
+            res.close()
+    return "unknown"
 
 
 def _get(http: requests.Session, url: str, params: dict) -> dict:

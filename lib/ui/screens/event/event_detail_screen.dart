@@ -338,6 +338,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                 image: DecorationImage(
                                   image: NetworkImage(imageUrl),
                                   fit: BoxFit.cover,
+                                  // A broken upload leaves the box empty instead of throwing.
+                                  onError: (error, stackTrace) {},
                                 ),
                               ),
                               child: Stack(
