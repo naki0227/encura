@@ -5,6 +5,7 @@ import 'package:encura/core/models/trending_article.dart';
 import 'package:encura/core/repositories/daily_column_repository.dart';
 import 'package:encura/core/repositories/trending_repository.dart';
 import 'package:encura/ui/widgets/daily_art_detail_dialog.dart';
+import '../../../core/utils/image_url.dart';
 
 class ArchiveScreen extends StatefulWidget {
   final int initialIndex;
@@ -23,13 +24,13 @@ class _ArchiveScreenState extends State<ArchiveScreen> with SingleTickerProvider
   final TrendingRepository _trendingRepository = TrendingRepository();
 
   // Daily Art State
-  List<DailyColumn> _dailyColumns = [];
+  final List<DailyColumn> _dailyColumns = [];
   bool _isLoadingDaily = false;
   bool _hasMoreDaily = true;
   int _dailyOffset = 0;
 
   // Trending State
-  List<TrendingArticle> _trendingArticles = [];
+  final List<TrendingArticle> _trendingArticles = [];
   bool _isLoadingTrending = false;
   bool _hasMoreTrending = true;
   int _trendingOffset = 0;
@@ -118,13 +119,7 @@ class _ArchiveScreenState extends State<ArchiveScreen> with SingleTickerProvider
     _loadTrendingArticles(refresh: true);
   }
 
-  String _sanitizeUrl(String url) {
-    String cleanUrl = url.trim();
-    if (cleanUrl.contains(RegExp(r'[^\x00-\x7F]'))) {
-      cleanUrl = Uri.encodeFull(cleanUrl);
-    }
-    return cleanUrl;
-  }
+  String _sanitizeUrl(String url) => normalizeImageUrl(url);
 
   void _showColumnDetails(DailyColumn column) {
     showDialog(

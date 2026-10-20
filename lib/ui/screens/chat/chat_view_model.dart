@@ -81,7 +81,11 @@ class ChatViewModel extends ChangeNotifier {
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.camera,
-        imageQuality: 100, // Send high quality to server for processing
+        // Cap the size so the fallback path (optimizer unavailable) stays
+        // within the curator function's request limit.
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 90,
       );
       if (image == null) return;
 

@@ -1,125 +1,193 @@
-import os
-import json
-import datetime
-import google.generativeai as genai
-from supabase import create_client, Client
-from dotenv import load_dotenv
+#!/usr/bin/env python3
+"""Exhibition crawler (daily).
 
-load_dotenv()
+Finds art exhibitions in Japan with Gemini + Google Search, and stores only
+the ones whose official page actually names the exhibition. Venues get their
+coordinates from the GSI address search, not from the model.
 
-def main():
-    # 1. Configuration
-    gemini_api_key = os.environ.get("GEMINI_API_KEY")
-    supabase_url = os.environ.get("SUPABASE_URL")
-    supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
+    python scripts/daily_crawler.py [--dry-run]
+"""
+from __future__ import annotations
 
-    if not gemini_api_key or not supabase_url or not supabase_key:
-        print("Error: Missing environment variables.")
+import datetime as dt
+import sys
+from dataclasses import dataclass
+
+from common import db, gemini, geo, web
+
+LOOKAHEAD_DAYS = 45
+MAX_EVENT_DAYS = 400
+
+SYSTEM = """あなたは日本の美術展の情報を調べる編集者です。
+必ず Google 検索で公式情報を確認し、確認できたものだけを答えます。
+記憶や推測で展覧会・会期・会場を作ってはいけません。"""
+
+PROMPT = """今日は {today} です。日本国内で、今日開催中、または今日から {days} 日以内に始まる
+美術展・博物館の企画展を、地域が偏らないように最大 15 件調べてください。
+
+条件:
+- 美術館・博物館などの公式サイトで、展覧会名と会期を確認できたものだけ
+- 会期の終了日が {today} 以降
+- official_url は主催館の公式ページの URL（ニュースサイトやまとめサイトは不可）
+- summary は公式情報に書かれている内容だけで 100 字程度にまとめる
+
+JSON 配列だけを出力してください。
+[
+  {{
+    "title": "展覧会名（公式表記どおり）",
+    "venue": "会場名（公式表記どおり）",
+    "venue_address": "会場の住所（都道府県から）",
+    "start_date": "YYYY-MM-DD",
+    "end_date": "YYYY-MM-DD",
+    "official_url": "https://...",
+    "summary": "概要"
+  }}
+]"""
+
+
+@dataclass
+class Candidate:
+    title: str
+    venue: str
+    venue_address: str
+    start_date: dt.date
+    end_date: dt.date
+    official_url: str
+    summary: str
+
+
+def _date(value) -> dt.date | None:
+    try:
+        return dt.date.fromisoformat(str(value).strip())
+    except ValueError:
+        return None
+
+
+def parse_candidates(items, today: dt.date) -> list[Candidate]:
+    """Keep well-formed, current entries; drop everything else."""
+    out = []
+    if not isinstance(items, list):
+        return out
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or "").strip()
+        venue = str(item.get("venue") or "").strip()
+        start, end = _date(item.get("start_date")), _date(item.get("end_date"))
+        if not title or not venue or not start or not end:
+            continue
+        if end < today or start > end or (end - start).days > MAX_EVENT_DAYS:
+            continue
+        if start > today + dt.timedelta(days=LOOKAHEAD_DAYS):
+            continue
+        out.append(Candidate(
+            title=title,
+            venue=venue,
+            venue_address=str(item.get("venue_address") or "").strip(),
+            start_date=start,
+            end_date=end,
+            official_url=str(item.get("official_url") or "").strip(),
+            summary=str(item.get("summary") or "").strip(),
+        ))
+    return out
+
+
+def match_venue(name: str, venues: list[dict]) -> dict | None:
+    key = web.normalize(name)
+    for venue in venues:
+        if web.normalize(venue.get("name") or "") == key:
+            return venue
+    return None
+
+
+def ensure_venue(client, cand: Candidate, venues: list[dict], dry_run: bool) -> dict:
+    venue = match_venue(cand.venue, venues)
+    coords = None
+    if venue is None or not venue.get("location"):
+        coords = geo.geocode(cand.venue_address) if cand.venue_address else None
+
+    if venue is None:
+        data = {"name": cand.venue, "address": cand.venue_address or None}
+        if coords:
+            data["location"] = geo.to_wkt(*coords)
+        print(f"  new venue: {cand.venue} ({'located' if coords else 'no location'})")
+        if dry_run:
+            venue = {"id": None, **data}
+        else:
+            venue = client.table("venues").insert(data).execute().data[0]
+        venues.append(venue)
+    elif coords and not venue.get("location"):
+        print(f"  adding location to venue: {cand.venue}")
+        if not dry_run:
+            client.table("venues").update({"location": geo.to_wkt(*coords)}).eq("id", venue["id"]).execute()
+        venue["location"] = geo.to_wkt(*coords)
+    return venue
+
+
+def upsert_event(client, cand: Candidate, source_url: str, venue: dict, dry_run: bool) -> None:
+    data = {
+        "title": cand.title,
+        "venue": cand.venue,
+        "venue_id": venue.get("id"),
+        "start_date": cand.start_date.isoformat(),
+        "end_date": cand.end_date.isoformat(),
+        "description_json": {"summary": cand.summary},
+        "source_url": source_url,
+    }
+    if venue.get("location"):
+        data["location"] = venue["location"]
+
+    existing = []
+    if not dry_run and venue.get("id"):
+        existing = client.table("events").select("id, title").eq("venue_id", venue["id"]).execute().data
+    key = web.normalize(cand.title)
+    match = next((e for e in existing if web.normalize(e["title"]) == key), None)
+
+    print(f"  {'update' if match else 'insert'}: {cand.title} ({cand.start_date} - {cand.end_date})")
+    if dry_run:
         return
-
-    if not os.environ.get("SUPABASE_SERVICE_ROLE_KEY"):
-        print("WARNING: SUPABASE_SERVICE_ROLE_KEY is missing. Using ANON KEY. Writes may fail due to RLS.")
+    if match:
+        client.table("events").update(data).eq("id", match["id"]).execute()
     else:
-        print("Using SUPABASE_SERVICE_ROLE_KEY.")
+        client.table("events").insert(data).execute()
 
-    genai.configure(api_key=gemini_api_key)
-    supabase: Client = create_client(supabase_url, supabase_key)
 
-    # 2. Prompt Gemini
-    model = genai.GenerativeModel('gemini-2.5-flash')
-    today_str = datetime.date.today().isoformat()
-    prompt = f"""
-    現在（{today_str}時点）、日本国内（東京・大阪中心）で開催中または開催予定の主要な美術展を20件ピックアップし、以下のJSON形式で出力してください。
-    終了日が {today_str} 以降のものに限ります。
-    JSON以外の余計なテキストは含めないでください。
+def main(dry_run: bool = False) -> int:
+    today = dt.date.today()
+    client = None if dry_run else db.client()
 
-    JSON形式:
-    [
-      {{
-        "title": "展覧会名",
-        "venue": "会場名",
-        "start_date": "YYYY-MM-DD",
-        "end_date": "YYYY-MM-DD",
-        "description_json": "{{\\"summary\\": \\"展覧会の概要（100文字程度）\\"}}"
-      }}
-    ]
-    """
+    result = gemini.generate(
+        PROMPT.format(today=today.isoformat(), days=LOOKAHEAD_DAYS),
+        system=SYSTEM,
+        search=True,
+    )
+    print(f"Gemini ({result.model}) used {len(result.sources)} web sources.")
+    candidates = parse_candidates(gemini.extract_json(result.text), today)
+    print(f"{len(candidates)} well-formed candidates.")
 
-    print("Fetching events from Gemini...")
-    try:
-        response = model.generate_content(prompt)
-        text = response.text
-        # Clean up markdown code blocks if present
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0]
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0]
-        
-        events = json.loads(text.strip())
-        print(f"Got {len(events)} events.")
-    except Exception as e:
-        print(f"Error fetching/parsing from Gemini: {e}")
-        return
+    source_urls = [s.uri for s in result.sources]
+    venues = [] if dry_run else client.table("venues").select("id, name, location").execute().data
 
-    # 3. Cleanup Past Events
-    print("Cleaning up past events...")
-    try:
-        today_str = datetime.date.today().isoformat()
-        # Delete events where end_date is before today
-        supabase.table('events').delete().lt('end_date', today_str).execute()
-        print("Deleted past events.")
-    except Exception as e:
-        print(f"Error cleaning up events: {e}")
-
-    # 4. Upsert to Supabase
-    for event in events:
+    stored = 0
+    for cand in candidates:
+        print(f"- {cand.title} @ {cand.venue}")
+        # The exhibition must be named on its official page, or failing that,
+        # on one of the pages the search actually used.
+        verified = web.find_page_mentioning(cand.title, [cand.official_url] + source_urls)
+        if not verified:
+            print("  skipped: no page confirms this exhibition")
+            continue
         try:
-            # --- Venue Handling ---
-            venue_name = event['venue']
-            venue_id = None
-            
-            # Check if venue exists
-            existing_venue = supabase.table('venues').select('id').eq('name', venue_name).execute()
-            
-            if existing_venue.data and len(existing_venue.data) > 0:
-                venue_id = existing_venue.data[0]['id']
-                print(f"Found existing venue: {venue_name} ({venue_id})")
-            else:
-                # Insert new venue
-                print(f"Inserting new venue: {venue_name}")
-                new_venue = supabase.table('venues').insert({
-                    'name': venue_name,
-                    # 'address': ... # Gemini prompt doesn't ask for address yet, could add later
-                }).execute()
-                if new_venue.data:
-                    venue_id = new_venue.data[0]['id']
-            
-            # --- Event Handling ---
-            # We want to upsert based on title and venue to avoid duplicates.
-            
-            existing_event = supabase.table('events').select('id').eq('title', event['title']).eq('venue', event['venue']).execute()
-            
-            data = {
-                "title": event['title'],
-                "venue": event['venue'],
-                "venue_id": venue_id, # Link to venue
-                "start_date": event['start_date'],
-                "end_date": event['end_date'],
-                "description_json": json.loads(event['description_json']) if isinstance(event['description_json'], str) else event['description_json'],
-            }
+            venue = ensure_venue(client, cand, venues, dry_run)
+            upsert_event(client, cand, verified, venue, dry_run)
+            stored += 1
+        except Exception as e:  # keep going; one bad row should not drop the rest
+            print(f"  error: {e}")
 
-            if existing_event.data and len(existing_event.data) > 0:
-                # Update
-                event_id = existing_event.data[0]['id']
-                print(f"Updating event: {event['title']} ({event['start_date']} ~ {event['end_date']})")
-                supabase.table('events').update(data).eq('id', event_id).execute()
-            else:
-                # Insert
-                print(f"Inserting event: {event['title']} ({event['start_date']} ~ {event['end_date']})")
-                supabase.table('events').insert(data).execute()
-                
-        except Exception as e:
-            print(f"Error upserting event {event.get('title')}: {e}")
+    print(f"Stored {stored} verified exhibitions.")
+    # A run that stores nothing is a failure worth seeing in Actions.
+    return 0 if stored else 1
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main(dry_run="--dry-run" in sys.argv))

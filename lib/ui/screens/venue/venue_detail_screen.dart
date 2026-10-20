@@ -90,7 +90,12 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
   }
 
   Future<void> _uploadMap(ImageSource source) async {
-    final XFile? image = await _picker.pickImage(source: source);
+    final XFile? image = await _picker.pickImage(
+      source: source,
+      maxWidth: 2048,
+      maxHeight: 2048,
+      imageQuality: 90,
+    );
     if (image == null) return;
 
     if (!mounted) return;
@@ -269,6 +274,8 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                         image: DecorationImage(
                           image: NetworkImage(_maps[index]),
                           fit: BoxFit.cover,
+                          // A broken upload leaves the box empty instead of throwing.
+                          onError: (error, stackTrace) {},
                         ),
                         boxShadow: [
                           BoxShadow(

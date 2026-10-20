@@ -2,19 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:encura/core/models/daily_column.dart';
+import '../../core/utils/image_url.dart';
 
 class DailyArtDetailDialog extends StatelessWidget {
   final DailyColumn column;
 
   const DailyArtDetailDialog({super.key, required this.column});
 
-  String _sanitizeUrl(String url) {
-    String cleanUrl = url.trim();
-    if (cleanUrl.contains(RegExp(r'[^\x00-\x7F]'))) {
-      cleanUrl = Uri.encodeFull(cleanUrl);
-    }
-    return cleanUrl;
-  }
+  String _sanitizeUrl(String url) => normalizeImageUrl(url);
 
   Future<void> _launchAffiliateUrl(BuildContext context) async {
     String url = column.affiliateUrl ?? '';
@@ -43,7 +38,6 @@ class DailyArtDetailDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     // Gold color for the button
     const goldColor = Color(0xFFC5A059);
 

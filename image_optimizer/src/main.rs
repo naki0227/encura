@@ -1,5 +1,5 @@
 use actix_multipart::Multipart;
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_web::{get, post, App, HttpResponse, HttpServer, Responder};
 use futures::{StreamExt, TryStreamExt};
 use image::imageops::FilterType;
 use image::GenericImageView;
@@ -13,7 +13,7 @@ async fn health() -> impl Responder {
 #[post("/process")]
 async fn process_image(mut payload: Multipart) -> impl Responder {
     let mut processed_image_data = Vec::new();
-    let mut filename = String::from("processed.jpg");
+    let filename = String::from("processed.jpg");
 
     // Iterate over multipart stream
     while let Ok(Some(mut field)) = payload.try_next().await {

@@ -11,6 +11,7 @@ import 'package:encura/ui/screens/venue/venue_search_screen.dart';
 import 'package:encura/ui/screens/settings/settings_screen.dart';
 import 'package:encura/ui/screens/archive/archive_screen.dart';
 import 'package:encura/ui/widgets/daily_art_detail_dialog.dart';
+import '../../../core/utils/image_url.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -68,7 +69,10 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (article.imageUrl.isNotEmpty)
-                Image.network(article.imageUrl),
+                Image.network(
+                  _sanitizeUrl(article.imageUrl),
+                  errorBuilder: (context, error, stackTrace) => const SizedBox(),
+                ),
               const SizedBox(height: 16),
               Text(article.content ?? article.summary),
               if (article.sourceUrl != null && article.sourceUrl!.isNotEmpty) ...[
@@ -88,14 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _sanitizeUrl(String url) {
-    String cleanUrl = url.trim();
-    // Check for non-ASCII characters (e.g. Japanese)
-    if (cleanUrl.contains(RegExp(r'[^\x00-\x7F]'))) {
-      cleanUrl = Uri.encodeFull(cleanUrl);
-    }
-    return cleanUrl;
-  }
+  String _sanitizeUrl(String url) => normalizeImageUrl(url);
 
   @override
   Widget build(BuildContext context) {

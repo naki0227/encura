@@ -12,6 +12,8 @@
 		<string>現在地周辺の展覧会情報を表示するために、常にまたは使用中に位置情報を使用します。</string>
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
+		<key>ITSAppUsesNonExemptEncryption</key>
+		<false/>
 		<key>CFBundleDisplayName</key>
 		<string>Encura</string>
 		<key>CFBundleExecutable</key>

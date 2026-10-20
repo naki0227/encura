@@ -2,41 +2,20 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class MapService {
   final SupabaseClient _supabase = Supabase.instance.client;
-  late final GenerativeModel _model;
-
-  MapService() {
-    final apiKey = dotenv.env['GEMINI_API_KEY'];
-    if (apiKey == null) {
-      throw Exception('GEMINI_API_KEY not found in .env');
-    }
-    _model = GenerativeModel(
-      model: 'gemini-2.0-flash-exp', // Using Flash for speed
-      apiKey: apiKey,
-      generationConfig: GenerationConfig(responseMimeType: 'application/json'),
-    );
-  }
 
   Future<bool> verifyAndUploadMap(File imageFile, String? eventId, String? venueId) async {
     try {
-      // 1. Verify with Gemini
+      // 1. Verify with Gemini (via the curator Edge Function)
       final imageBytes = await imageFile.readAsBytes();
-      final prompt = TextPart(
-          'Is this image a map, floor plan, or venue guide? Respond with JSON: {"is_map": true/false}');
-      final imagePart = DataPart('image/jpeg', imageBytes); // Assuming jpeg or converting
-
-      final response = await _model.generateContent([
-        Content.multi([prompt, imagePart])
-      ]);
-
-      if (response.text == null) return false;
-
-      final jsonResponse = jsonDecode(response.text!) as Map<String, dynamic>;
-      final isMap = jsonResponse['is_map'] as bool? ?? false;
+      final response = await _supabase.functions.invoke(
+        'curator',
+        body: {'task': 'is_map', 'image': base64Encode(imageBytes)},
+      );
+      final data = response.data;
+      final isMap = data is Map && data['is_map'] == true;
 
       if (!isMap) {
         debugPrint('Image rejected by AI: Not a map.');

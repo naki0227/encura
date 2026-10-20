@@ -48,8 +48,8 @@ class _EventMapScreenContent extends StatelessWidget {
                         height: 40,
                         child: const Icon(Icons.my_location, color: Colors.blue),
                       ),
-                    ...viewModel.events.map((event) => Marker(
-                          point: event.location,
+                    ...viewModel.events.where((event) => event.location != null).map((event) => Marker(
+                          point: event.location!,
                           width: 40,
                           height: 40,
                           child: GestureDetector(

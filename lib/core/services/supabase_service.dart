@@ -1,14 +1,20 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+import '../config/app_config.dart';
 
 class SupabaseService {
   static Future<void> initialize() async {
-    final supabaseUrl = dotenv.env['SUPABASE_URL']!;
-    final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY']!;
+    if (!AppConfig.isSupabaseConfigured) {
+      throw StateError(
+        'SUPABASE_URL / SUPABASE_ANON_KEY are not set. '
+        'Build with --dart-define-from-file=config/prod.json (see docs/RELEASE.md).',
+      );
+    }
 
     await Supabase.initialize(
-      url: supabaseUrl,
-      anonKey: supabaseAnonKey,
+      url: AppConfig.supabaseUrl,
+      anonKey: AppConfig.supabaseAnonKey,
     );
   }
 
@@ -20,8 +26,7 @@ class SupabaseService {
       try {
         await client.auth.signInAnonymously();
       } catch (e) {
-        // Handle error or log it
-        // debugPrint('Error signing in anonymously: $e');
+        debugPrint('Error signing in anonymously: $e');
       }
     }
   }

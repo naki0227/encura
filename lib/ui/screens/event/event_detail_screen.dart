@@ -20,7 +20,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   final MapService _mapService = MapService();
   final ImagePicker _picker = ImagePicker();
   List<String> _maps = [];
-  bool _isLoadingMaps = true;
 
   @override
   void initState() {
@@ -47,13 +46,17 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     if (mounted) {
       setState(() {
         _maps = maps;
-        _isLoadingMaps = false;
       });
     }
   }
 
   Future<void> _scanAndUploadMap() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: 2048,
+      maxHeight: 2048,
+      imageQuality: 90,
+    );
     if (image == null) return;
 
     if (!mounted) return;
@@ -102,23 +105,19 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 
   Future<void> _launchMap() async {
-    // Try to launch with coordinates first
-    final Uri googleMapsUrl = Uri.parse(
-        'https://www.google.com/maps/search/?api=1&query=${widget.event.location.latitude},${widget.event.location.longitude}');
-    
-    if (await canLaunchUrl(googleMapsUrl)) {
-      await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
-    } else {
-      // Fallback to venue name search
-      final Uri venueSearchUrl = Uri.parse(
-          'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(widget.event.venue)}');
-      if (await canLaunchUrl(venueSearchUrl)) {
-        await launchUrl(venueSearchUrl, mode: LaunchMode.externalApplication);
-      } else {
-        // debugPrint('Could not launch map.');
-      }
+    // Use coordinates only when the event really has them; otherwise search
+    // by venue name rather than pointing at a default spot.
+    final location = widget.event.location;
+    final query = location != null
+        ? '${location.latitude},${location.longitude}'
+        : widget.event.venue;
+    final Uri url = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(query)}');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
     }
   }
+
 
   Future<void> _launchOfficialSite() async {
     if (widget.event.sourceUrl != null) {
@@ -339,6 +338,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                 image: DecorationImage(
                                   image: NetworkImage(imageUrl),
                                   fit: BoxFit.cover,
+                                  // A broken upload leaves the box empty instead of throwing.
+                                  onError: (error, stackTrace) {},
                                 ),
                               ),
                               child: Stack(
