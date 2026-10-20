@@ -43,7 +43,6 @@ class DailyArtDetailDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     // Gold color for the button
     const goldColor = Color(0xFFC5A059);
 

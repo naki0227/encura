@@ -84,7 +84,7 @@ def main():
         exclusion_text = f"以下のトピックは既に存在するため、絶対に生成しないでください: {exclusion_list}"
 
     # 3. Prompt Gemini
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel(os.environ.get("GEMINI_MODEL") or "gemini-3.8-flash")
     prompt = f"""
     「実は怖い絵画」「画家の意外な副業」「修復の失敗事例」など、SNSでバズりそうな美術ミステリーやトリビアを10個作成してください。
     

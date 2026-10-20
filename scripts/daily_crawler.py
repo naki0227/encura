@@ -26,7 +26,7 @@ def main():
     supabase: Client = create_client(supabase_url, supabase_key)
 
     # 2. Prompt Gemini
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel(os.environ.get("GEMINI_MODEL") or "gemini-3.8-flash")
     today_str = datetime.date.today().isoformat()
     prompt = f"""
     現在（{today_str}時点）、日本国内（東京・大阪中心）で開催中または開催予定の主要な美術展を20件ピックアップし、以下のJSON形式で出力してください。

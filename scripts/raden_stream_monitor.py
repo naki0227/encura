@@ -114,7 +114,9 @@ def main(dry_run=False):
 
     # Fetch recent videos
     print("Fetching recent videos from Raden's channel...")
-    videos = get_recent_videos(gemini_api_key, RADEN_CHANNEL_ID)
+    # A Gemini key from AI Studio is usually not enabled for YouTube Data API.
+    youtube_api_key = os.environ.get("YOUTUBE_API_KEY", "").strip() or gemini_api_key
+    videos = get_recent_videos(youtube_api_key, RADEN_CHANNEL_ID)
     
     if not videos:
         print("No videos found or API error. Exiting.")
@@ -144,7 +146,7 @@ def main(dry_run=False):
         return
 
     # Use Gemini to extract artworks mentioned
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel(os.environ.get("GEMINI_MODEL") or "gemini-3.8-flash")
     
     for video in art_videos[:3]:  # Process up to 3 videos at a time
         print(f"\nAnalyzing: {video['title']}")

@@ -90,7 +90,7 @@ def main(dry_run=False):
         exclusion_text = f"以下のトピックは既に存在するため、生成しないでください: {exclusion_list}"
 
     # Prompt Gemini for trending art topics
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel(os.environ.get("GEMINI_MODEL") or "gemini-3.8-flash")
     prompt = f"""
     現在SNSやニュースで話題の美術展・作品・アートトピックを5件作成してください。
     以下のカテゴリから幅広く選んでください：

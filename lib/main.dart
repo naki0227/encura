@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -10,7 +9,6 @@ import 'ui/screens/chat/chat_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env");
   await SupabaseService.initialize();
   await SupabaseService.signInAnonymously();
   runApp(const EnCuraApp());
@@ -102,7 +100,7 @@ class _MainScreenState extends State<MainScreen> {
     showDialog(
       context: context,
       barrierDismissible: false, // Prevent closing without agreement
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('AI解説と投稿に関する注意事項'),
         content: SingleChildScrollView(
           child: Column(
@@ -138,7 +136,7 @@ class _MainScreenState extends State<MainScreen> {
           ElevatedButton(
             onPressed: () async {
               await prefs.setBool('has_agreed_to_terms', true);
-              if (mounted) Navigator.pop(context);
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
             },
             child: const Text('同意して利用を開始'),
           ),

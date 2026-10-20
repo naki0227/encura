@@ -20,7 +20,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   final MapService _mapService = MapService();
   final ImagePicker _picker = ImagePicker();
   List<String> _maps = [];
-  bool _isLoadingMaps = true;
 
   @override
   void initState() {
@@ -47,13 +46,17 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     if (mounted) {
       setState(() {
         _maps = maps;
-        _isLoadingMaps = false;
       });
     }
   }
 
   Future<void> _scanAndUploadMap() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: 2048,
+      maxHeight: 2048,
+      imageQuality: 90,
+    );
     if (image == null) return;
 
     if (!mounted) return;

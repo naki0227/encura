@@ -143,7 +143,7 @@ def main(dry_run=False):
     print(f"Found {len(relevant_exhibitions)} relevant exhibitions.")
 
     # Use Gemini to generate detailed articles
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel(os.environ.get("GEMINI_MODEL") or "gemini-3.8-flash")
     year = datetime.now().year
 
     for exhibition in relevant_exhibitions:

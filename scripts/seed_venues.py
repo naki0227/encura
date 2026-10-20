@@ -18,7 +18,7 @@ def main():
     supabase: Client = create_client(supabase_url, supabase_key)
 
     # 2. Prompt Gemini
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel(os.environ.get("GEMINI_MODEL") or "gemini-3.8-flash")
     prompt = """
     日本国内（東京、大阪、京都、愛知、金沢など）の主要な美術館・博物館を30ヶ所リストアップしてください。
     以下のJSON形式で出力してください。JSON以外の余計なテキストは含めないでください。

@@ -23,13 +23,13 @@ class _ArchiveScreenState extends State<ArchiveScreen> with SingleTickerProvider
   final TrendingRepository _trendingRepository = TrendingRepository();
 
   // Daily Art State
-  List<DailyColumn> _dailyColumns = [];
+  final List<DailyColumn> _dailyColumns = [];
   bool _isLoadingDaily = false;
   bool _hasMoreDaily = true;
   int _dailyOffset = 0;
 
   // Trending State
-  List<TrendingArticle> _trendingArticles = [];
+  final List<TrendingArticle> _trendingArticles = [];
   bool _isLoadingTrending = false;
   bool _hasMoreTrending = true;
   int _trendingOffset = 0;
