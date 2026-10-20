@@ -123,7 +123,7 @@ class _MainScreenState extends State<MainScreen> {
                   style: TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
                 ),
                 onTap: () async {
-                  final Uri url = Uri.parse('https://garrulous-court-1b7.notion.site/EnCura-2bda7052569880f1a124c2b45d0b4c9b?source=copy_link');
+                  final Uri url = Uri.parse('https://enludus.com/products/encura-terms');
                   if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
                     debugPrint('Could not launch $url');
                   }

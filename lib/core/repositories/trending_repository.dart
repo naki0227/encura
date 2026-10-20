@@ -1,4 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../utils/search_filter.dart';
 import '../models/trending_article.dart';
 
 class TrendingRepository {
@@ -33,7 +35,7 @@ class TrendingRepository {
           .eq('is_published', true);
 
       if (query != null && query.isNotEmpty) {
-        queryBuilder = queryBuilder.or('title.ilike.%$query%,content.ilike.%$query%,keyword.ilike.%$query%');
+        queryBuilder = queryBuilder.or(ilikeAnyFilter(['title', 'content', 'keyword'], query));
       }
 
       final response = await queryBuilder

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:encura/core/repositories/event_repository.dart';
 import 'package:encura/core/services/event_service.dart';
 import '../event/event_detail_screen.dart';
@@ -77,7 +78,13 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(article.content ?? article.summary),
               if (article.sourceUrl != null && article.sourceUrl!.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                Text('Source: ${article.sourceUrl}', style: const TextStyle(color: Colors.blue)),
+                InkWell(
+                  onTap: () => _openSource(article.sourceUrl!),
+                  child: Text(
+                    'Source: ${article.sourceUrl}',
+                    style: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
+                  ),
+                ),
               ]
             ],
           ),
@@ -94,15 +101,59 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _sanitizeUrl(String url) => normalizeImageUrl(url);
 
+  bool get _hasContent => _dailyColumn != null || _trendingArticles.isNotEmpty || _events.isNotEmpty;
+
+  List<Widget> _actions() => [
+        IconButton(
+          icon: const Icon(Icons.search, color: Colors.white),
+          tooltip: '美術館を探す',
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const VenueSearchScreen()),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.history, color: Colors.white),
+          tooltip: 'アーカイブ',
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ArchiveScreen(initialIndex: 0)),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.settings, color: Colors.white),
+          tooltip: '設定',
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const SettingsScreen()),
+          ),
+        ),
+      ];
+
+  Future<void> _openSource(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('EnCura'),
+        // The buttons normally sit on the Today's Art header; without it
+        // (offline, or nothing scheduled) they must stay reachable.
+        actions: _isLoading || _dailyColumn != null ? null : _actions(),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : CustomScrollView(
+          : !_hasContent
+              ? _buildEmptyState()
+              : RefreshIndicator(
+                  onRefresh: _loadData,
+                  child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 if (_dailyColumn != null)
                   SliverAppBar(
@@ -112,35 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     backgroundColor: Theme.of(context).scaffoldBackgroundColor,
 
 
-                    actions: [
-                      IconButton(
-                        icon: const Icon(Icons.search, color: Colors.white),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const VenueSearchScreen()),
-                          );
-                        },
-                      ),
-                        IconButton(
-                          icon: const Icon(Icons.history, color: Colors.white),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const ArchiveScreen(initialIndex: 0)),
-                            );
-                          },
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.settings, color: Colors.white),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const SettingsScreen()),
-                            );
-                          },
-                        ),
-                    ],
+                    actions: _actions(),
                     flexibleSpace: FlexibleSpaceBar(
                       stretchModes: const [
                         StretchMode.zoomBackground,
@@ -503,6 +526,35 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
+                ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off, size: 48, color: Colors.grey),
+            const SizedBox(height: 16),
+            const Text(
+              '情報を読み込めませんでした。\n通信状況を確認して、もう一度お試しください。',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            OutlinedButton.icon(
+              onPressed: () {
+                setState(() => _isLoading = true);
+                _loadData();
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('再読み込み'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

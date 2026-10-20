@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:encura/ui/screens/venue/venue_detail_screen.dart';
+import 'package:encura/core/utils/venue_sort.dart';
 
 class VenueSearchScreen extends StatefulWidget {
   const VenueSearchScreen({super.key});
@@ -43,7 +45,7 @@ class _VenueSearchScreenState extends State<VenueSearchScreen> {
       }
     } catch (e) {
       debugPrint('Error loading venues: $e');
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -52,40 +54,37 @@ class _VenueSearchScreenState extends State<VenueSearchScreen> {
       _isLoading = true;
       _activeTab = 'nearby';
     });
-    
+
     try {
-      // Check permissions
-      LocationPermission permission = await Geolocator.checkPermission();
+      var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
+      }
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        if (mounted) {
           setState(() => _isLoading = false);
-          return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('位置情報が許可されていないため、近くの美術館を探せません。')),
+          );
         }
+        return;
       }
 
-      // final position = await Geolocator.getCurrentPosition();
-      
-      // Use RPC for nearby search if available, or just client-side sort for now (simple MVP)
-      // Ideally: .rpc('nearby_venues', params: {'lat': position.latitude, 'long': position.longitude})
-      // For now, let's just fetch all and sort (assuming small dataset) or use simple query
-      
+      final position = await Geolocator.getCurrentPosition();
       final data = await _supabase.from('venues').select();
-      final allVenues = List<Map<String, dynamic>>.from(data);
-      
-      // Simple distance calculation (not accurate for large scale but ok for MVP list sort)
-      // Note: This requires location data in venues, which might be null initially from crawler
-      // We will filter out venues without location
-      
-      // For now, just show all as we might not have location data yet
-      setState(() {
-        _venues = allVenues;
-        _isLoading = false;
-      });
-      
+      final sorted = sortByDistance(
+        List<Map<String, dynamic>>.from(data),
+        LatLng(position.latitude, position.longitude),
+      );
+      if (mounted) {
+        setState(() {
+          _venues = sorted;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       debugPrint('Error loading nearby venues: $e');
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

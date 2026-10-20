@@ -132,7 +132,7 @@ App Store Connect API キーの作り方:
 1. 新しいバージョン **1.0.5** を作り、TestFlight で確認したビルドを選ぶ。
 2. App 情報を直す。
    - サポート URL・マーケティング URL: `https://enludus.vercel.app` → `https://enludus.com`
-   - プライバシーポリシー URL: アプリ内と同じ Notion ページが公開状態か、ブラウザで確認する。チャット・画像が Supabase（Edge Function）経由で Google の AI に送られることが書かれているかも確認する
+   - プライバシーポリシー URL: `https://enludus.com/products/encura-privacy`（naki0227/company-web#22 をマージして公開されてから設定する。アプリ内のリンクもこのページに変えた）
    - 連絡先: contact@enludus.com
 3. 「App のプライバシー」の回答が変わらないか確認する（送るデータの種類は 1.04 と同じで、経路にサーバーが加わっただけ）。
 4. 「このバージョンの最新情報」に下のリリースノートを入れ、審査に提出する。

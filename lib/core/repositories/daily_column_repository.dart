@@ -1,4 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../utils/search_filter.dart';
 import '../models/daily_column.dart';
 
 class DailyColumnRepository {
@@ -52,7 +54,7 @@ class DailyColumnRepository {
           .lte('display_date', todayStr);
 
       if (query != null && query.isNotEmpty) {
-        queryBuilder = queryBuilder.or('title.ilike.%$query%,content.ilike.%$query%,artist.ilike.%$query%');
+        queryBuilder = queryBuilder.or(ilikeAnyFilter(['title', 'content', 'artist'], query));
       }
 
       final response = await queryBuilder

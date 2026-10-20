@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import '../../../core/services/chat_service.dart';
 import '../../../core/services/image_optimizer_service.dart';
@@ -25,37 +26,31 @@ class ChatViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
 
   Future<void> initialize(String? initialImageUrl) async {
-    if (initialImageUrl != null) {
-      // Simulate sending the image
-      _messages.add(ChatMessage(
-        text: 'Sent a map',
-        isUser: true,
-        // We don't have bytes here easily without downloading, so we might need to adjust ChatMessage or just show text
-        // For now, let's just start the conversation context
-      ));
-      _isLoading = true;
+    if (initialImageUrl == null) return;
+
+    _isLoading = true;
+    notifyListeners();
+    try {
+      // Send the map image itself; the model cannot open a URL.
+      final res = await http.get(Uri.parse(initialImageUrl)).timeout(const Duration(seconds: 20));
+      final isImage = res.statusCode == 200 &&
+          (res.headers['content-type'] ?? '').startsWith('image/');
+      if (!isImage) throw Exception('map image unavailable (${res.statusCode})');
+      final imageBytes = res.bodyBytes;
+      _messages.add(ChatMessage(text: 'この館内マップについて教えて', isUser: true, imageBytes: imageBytes));
       notifyListeners();
 
-      try {
-        // We need to fetch the image bytes if we want to send it to Gemini
-        // Or we can just send the URL if Gemini supports it (it doesn't directly via this SDK usually, needs bytes)
-        // For simplicity, let's assume we just ask a question about the map context, 
-        // but ideally we should download the image bytes from the URL.
-        
-        // TODO: Implement downloading image bytes from URL to send to Gemini
-        // For now, we will just send a text prompt saying we are looking at a map.
-        // Real implementation would require downloading the image.
-        
-        final response = await _chatService.sendMessage(
-          'I am looking at this venue map: $initialImageUrl. Please help me navigate.',
-        );
-        _messages.add(ChatMessage(text: response, isUser: false));
-      } catch (e) {
-        _messages.add(ChatMessage(text: 'Error loading map context: $e', isUser: false));
-      } finally {
-        _isLoading = false;
-        notifyListeners();
-      }
+      final response = await _chatService.sendMessage(
+        'これは美術館・博物館の館内マップです。主なエリアと見どころ、回り方を案内してください。',
+        imageBytes: imageBytes,
+      );
+      _messages.add(ChatMessage(text: response, isUser: false));
+    } catch (e) {
+      debugPrint('Map chat error: $e');
+      _messages.add(ChatMessage(text: 'マップ画像を読み込めませんでした。時間をおいて再度お試しください。', isUser: false));
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
