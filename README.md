@@ -77,6 +77,7 @@ graph TD
         DB[("PostgreSQL")]
         Storage["Bucket: venue_maps"]
         Auth["Authentication"]
+        Curator["Edge Function: curator"]
     end
     
     subgraph "High Performance Service (Cloud Run)"
@@ -93,9 +94,10 @@ graph TD
     end
 
     %% Flows
-    User -->|Chat| Gemini
+    User -->|Chat / Scan| Curator
+    Curator -->|API key on server| Gemini
     User -->|Raw Image| Rust
-    Rust -->|Optimized Image| Gemini
+    Rust -->|Optimized Image| User
     User -->|Read / Write| DB
     User -->|Upload Maps| Storage
     
@@ -119,20 +121,35 @@ This repository is for portfolio purposes. To run it on a real device, the follo
 *   Supabase Account
 *   Google AI Studio API Key
 
-### 2. Environment Variables
-Create a `.env` file in the root directory.
+### 2. Configuration
+No secret is bundled into the app. The Gemini API key lives only in the secrets of the `curator` Supabase Edge Function (`supabase/functions/curator`).
+
+App settings are passed at build time with `--dart-define-from-file`:
 
 ```bash
-SUPABASE_URL=your_supabase_url
-SUPABASE_ANON_KEY=your_anon_key
-GEMINI_API_KEY=your_gemini_api_key
+cp config/prod.example.json config/prod.json   # fill in values (config/*.json is git-ignored)
+```
+
+| Key | Value |
+| :--- | :--- |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_ANON_KEY` | Supabase anon (public) key |
+| `IMAGE_OPTIMIZER_URL` | Rust image optimizer `/process` endpoint (empty disables it) |
+
+Edge Function:
+
+```bash
+supabase secrets set GEMINI_API_KEY=...
+supabase functions deploy curator
 ```
 
 ### 3. Run
 ```bash
 flutter pub get
-flutter run
+flutter run --dart-define-from-file=config/prod.json
 ```
+
+See [docs/RELEASE.md](docs/RELEASE.md) for the release procedure.
 
 ---
 

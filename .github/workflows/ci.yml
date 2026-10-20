@@ -49,3 +49,12 @@ jobs:
           flutter build ios --release --no-codesign
           --dart-define=SUPABASE_URL=https://example.supabase.co
           --dart-define=SUPABASE_ANON_KEY=ci-placeholder
+
+  image-optimizer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: image_optimizer
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo build --locked --release

@@ -116,6 +116,7 @@ graph TD
         DB[("PostgreSQL")]
         Storage["Bucket: venue_maps"]
         Auth["Authentication"]
+        Curator["Edge Function: curator"]
     end
     
     subgraph "High Performance Service (Cloud Run)"
@@ -132,9 +133,10 @@ graph TD
     end
 
     %% Flows
-    User -->|Chat| Gemini
+    User -->|Chat / Scan| Curator
+    Curator -->|API key on server| Gemini
     User -->|Raw Image| Rust
-    Rust -->|Optimized Image| Gemini
+    Rust -->|Optimized Image| User
     User -->|Read / Write| DB
     User -->|Upload Maps| Storage
     
@@ -192,19 +194,35 @@ Supabase Account
 
 Google AI Studio API Key
 
-### 2. Environment Variables
-ルートディレクトリに .env ファイルを作成してください。
+### 2. 設定値
+アプリに秘密鍵は入れません。Gemini の API キーは Supabase Edge Function（`supabase/functions/curator`）のシークレットにだけ置きます。
 
-Bash
+アプリ側の設定はビルド時に `--dart-define-from-file` で渡します。
 
-SUPABASE_URL=your_supabase_url
-SUPABASE_ANON_KEY=your_anon_key
-GEMINI_API_KEY=your_gemini_api_key
-3. Run
-Bash
+```bash
+cp config/prod.example.json config/prod.json   # 値を埋める（config/*.json は git 管理外）
+```
 
+| キー | 中身 |
+| :--- | :--- |
+| `SUPABASE_URL` | Supabase プロジェクトの URL |
+| `SUPABASE_ANON_KEY` | Supabase の anon（公開）キー |
+| `IMAGE_OPTIMIZER_URL` | Rust 画像最適化サービスの `/process`（空にすると最適化を使わない） |
+
+Edge Function 側:
+
+```bash
+supabase secrets set GEMINI_API_KEY=...   # 値は表示・コミットしない
+supabase functions deploy curator
+```
+
+### 3. Run
+```bash
 flutter pub get
-flutter run
+flutter run --dart-define-from-file=config/prod.json
+```
+
+リリース手順は [docs/RELEASE.md](docs/RELEASE.md) を参照してください。
 
 ---
 ## 👨‍💻 開発者 (Developer)

@@ -49,3 +49,6 @@ app.*.map.json
 # Build-time config (pass with --dart-define-from-file); only the example is tracked
 config/*.json
 !config/*.example.json
+
+# Edge Function secrets for `supabase secrets set --env-file`
+supabase/.env*
