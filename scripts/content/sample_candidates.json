@@ -1,4 +1,11 @@
 {
+  "venues": [
+    {
+      "name": "東京国立博物館",
+      "address": "東京都台東区上野公園13-9",
+      "website_url": "https://www.tnm.jp/"
+    }
+  ],
   "exhibitions": [
     {
       "title": "特別展「例示の美術」",
@@ -12,7 +19,13 @@
     }
   ],
   "daily_art": [
-    {"title": "星月夜", "title_en": "The Starry Night", "artist": "フィンセント・ファン・ゴッホ", "artist_en": "Vincent van Gogh", "content": "作品の背景と見どころを200字程度で。"}
+    {
+      "title": "星月夜",
+      "title_en": "The Starry Night",
+      "artist": "フィンセント・ファン・ゴッホ",
+      "artist_en": "Vincent van Gogh",
+      "content": "作品の背景と見どころを200字程度で。"
+    }
   ],
   "news": [
     {
