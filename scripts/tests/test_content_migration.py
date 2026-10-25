@@ -28,7 +28,7 @@ class FakeChecks(bm.Checks):
 
 def checks_for_sample():
     return FakeChecks(
-        pages={"https://www.tnm.jp/": "特別展「例示の美術」", "https://example.com/article": "出典に載っている固有名詞"},
+        pages={"https://www.tnm.jp/": "東京国立博物館 特別展「例示の美術」", "https://example.com/article": "出典に載っている固有名詞"},
         images={"The Starry Night": "https://upload.wikimedia.org/starry.jpg"},
         coords=(35.717556, 139.775543),
     )
@@ -37,7 +37,7 @@ def checks_for_sample():
 def test_sample_produces_a_migration_that_passes_the_gate(tmp_path):
     body, report = bm.build(SAMPLE, NOW, checks_for_sample())
     assert body.startswith(bm.GENERATED_MARK)
-    assert len(report.accepted) == 3 and not report.rejected
+    assert len(report.accepted) == 4 and not report.rejected
     assert "POINT(139.775543 35.717556)" in body
     assert cm.statement_problems(body) == []
 
@@ -49,6 +49,7 @@ def test_unverified_items_are_rejected_not_written():
     assert "no page names this exhibition" in reasons
     assert "no image" in reasons
     assert "does not mention" in reasons
+    assert "official site does not name this museum" in reasons
 
 
 def test_exhibition_dates_are_checked():
@@ -103,4 +104,12 @@ def test_published_reads_items_back(tmp_path):
     items = published.published(tmp_path)
     assert ("exhibition", "特別展「例示の美術」 @ 東京国立博物館") in items
     assert ("daily art", "星月夜 / フィンセント・ファン・ゴッホ") in items
-    assert len(items) == 3
+    assert len(items) == 4
+
+
+def test_venue_needs_geocodable_address():
+    item = SAMPLE["venues"][0]
+    report = bm.Report()
+    no_coords = FakeChecks(pages={"https://www.tnm.jp/": "東京国立博物館"})
+    assert bm.venue_statements([item], no_coords, report) == []
+    assert "could not be geocoded" in report.rejected[0]

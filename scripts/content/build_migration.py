@@ -9,6 +9,8 @@ saves them as JSON; this script decides what is publishable:
   * Today's Art: the artwork must have an image on Wikidata/Commons credited
     to the same artist
   * news: the source page must name the subject of the story
+  * venues (museums listed in the app's venue search): the official site
+    must name the museum; the address is geocoded with the GSI address search
 
 Accepted items become supabase/migrations/<UTC timestamp>_content_<JST date>.sql.
 The SQL is idempotent (ON CONFLICT ...), so re-running a day is harmless.
@@ -95,7 +97,8 @@ class Checks:
         return web.find_page_mentioning(phrase, urls)
 
     def geocode(self, address: str):
-        return None if self.offline else geo.geocode(address)
+        # Offline runs (CI's SQL check) still exercise the location columns.
+        return (35.6812, 139.7671) if self.offline else geo.geocode(address)
 
     def artwork_image(self, titles: list[str], artists: list[str]) -> str | None:
         if self.offline:
@@ -188,6 +191,35 @@ from fresh f join free_day d using (k)
 on conflict (display_date) do nothing;"""]
 
 
+# --- venues -------------------------------------------------------------------------
+
+def venue_statements(items, checks: Checks, report: Report) -> list[str]:
+    out = []
+    for item in items or []:
+        name, address = venue_name(item.get("name")), clean(item.get("address"))
+        website = clean(item.get("website_url"))
+        label = name or "?"
+        if not name or not address or not web.is_http_url(website):
+            report.no("venue", label, "missing name, address or website")
+            continue
+        verified = checks.page_naming(name, [website])
+        if not verified:
+            report.no("venue", label, "official site does not name this museum")
+            continue
+        coords = checks.geocode(address)
+        if not coords:
+            report.no("venue", label, f"address could not be geocoded: {address}")
+            continue
+        out.append(f"""insert into public.venues (name, address, location, website_url)
+values ({sql.text(name)}, {sql.text(address)}, {sql.point(coords)}, {sql.text(verified)})
+on conflict (name) do update set
+    address = coalesce(public.venues.address, excluded.address),
+    location = coalesce(public.venues.location, excluded.location),
+    website_url = coalesce(public.venues.website_url, excluded.website_url);""")
+        report.ok("venue", label, address)
+    return out
+
+
 # --- news ---------------------------------------------------------------------------
 
 def news_statements(items, checks: Checks, report: Report) -> list[str]:
@@ -223,7 +255,8 @@ def build(candidates: dict, now: dt.datetime, checks: Checks) -> tuple[str | Non
     report = Report()
     today = now.astimezone(JST).date()
     statements = (
-        event_statements(candidates.get("exhibitions"), today, checks, report)
+        venue_statements(candidates.get("venues"), checks, report)
+        + event_statements(candidates.get("exhibitions"), today, checks, report)
         + daily_statement(candidates.get("daily_art"), checks, report)
         + news_statements(candidates.get("news"), checks, report)
     )
