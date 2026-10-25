@@ -19,10 +19,12 @@ class DailyColumnRepository {
           .maybeSingle();
 
       if (response == null) {
-        // Fallback: Fetch the latest column if today's is missing
+        // Fallback: the most recent past column if today's is missing
+        // (columns are scheduled ahead, so never show a future one).
         final latestResponse = await _client
             .from('daily_columns')
             .select()
+            .lte('display_date', todayStr)
             .order('display_date', ascending: false)
             .limit(1)
             .maybeSingle();
