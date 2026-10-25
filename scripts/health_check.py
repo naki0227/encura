@@ -82,8 +82,10 @@ def check_gemini_models(http: requests.Session) -> Check:
 # --- Supabase ---------------------------------------------------------------
 
 def _supabase_headers() -> dict:
-    key = env("SUPABASE_ANON_KEY")
-    return {"apikey": key, "Authorization": f"Bearer {key}"}
+    # The apikey header alone is enough for both the legacy anon key (a JWT)
+    # and the newer publishable key (sb_publishable_..., not a JWT, so it must
+    # not be sent as a Bearer token).
+    return {"apikey": env("SUPABASE_ANON_KEY")}
 
 
 @named('Supabase: database and content')
@@ -167,7 +169,7 @@ def check_curator_function(http: requests.Session) -> Check:
         return Check(name, FAIL, f"anonymous sign-in failed: HTTP {auth.status_code} {auth.text[:150]}")
     res = http.post(f"{base}/functions/v1/curator",
                     json={"task": "chat", "message": "「睡蓮」で知られる画家は誰ですか？一言で。"},
-                    headers={"apikey": env("SUPABASE_ANON_KEY"), "Authorization": f"Bearer {token}"},
+                    headers={**_supabase_headers(), "Authorization": f"Bearer {token}"},
                     timeout=TIMEOUT)
     if res.status_code != 200:
         return Check(name, FAIL, f"HTTP {res.status_code}: {res.text[:150]} (see function logs)")
