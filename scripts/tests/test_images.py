@@ -1,5 +1,12 @@
+import pytest
+
 from common import images
 from conftest import FakeResponse, FakeSession
+
+
+@pytest.fixture(autouse=True)
+def no_waiting(monkeypatch):
+    monkeypatch.setattr(images.time, "sleep", lambda seconds: None)
 
 
 def entity(image=None, creator=None, label=""):
@@ -40,6 +47,13 @@ def test_returns_none_instead_of_a_loose_match():
 
 
 BASE = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Starry.jpg"
+
+
+def test_keeps_going_when_wikimedia_rate_limits():
+    limited = FakeResponse(429, "Too many requests")
+    http = FakeSession([("wbsearchentities", limited)] * 5)
+    assert images.find_artwork_image(["Three Beauties"], ["Kitagawa Utamaro"], http) is None
+    assert len(http.calls) == 5
 
 
 def test_normalize_image_url_moves_to_allowed_width():

@@ -20,6 +20,10 @@ COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 # page (https://www.mediawiki.org/wiki/Common_thumbnail_sizes).
 THUMB_WIDTHS = (20, 40, 60, 120, 250, 330, 500, 960, 1280, 1920, 3840)
 THUMB_WIDTH = 960
+# Wikimedia's API etiquette: one request at a time, with a pause between them.
+# Bursts get 429 (Too many requests).
+API_INTERVAL = 1.0
+_last_api_call = 0.0
 
 _THUMB = re.compile(r"^(https://upload\.wikimedia\.org/wikipedia/[^?#]+/thumb/[^?#]+/)(\d+)px-([^/?#]+)")
 
@@ -60,12 +64,15 @@ def image_status(url: str, session: requests.Session | None = None) -> str:
 
 
 def _get(http: requests.Session, url: str, params: dict) -> dict:
-    for attempt in range(4):
+    global _last_api_call
+    for attempt in range(5):
+        time.sleep(max(0.0, _last_api_call + API_INTERVAL - time.monotonic()))
+        _last_api_call = time.monotonic()
         res = http.get(url, params={**params, "format": "json"},
                        headers={"User-Agent": USER_AGENT}, timeout=20)
         if res.status_code == 429 or res.status_code >= 500:
             wait = res.headers.get("Retry-After")
-            time.sleep(float(wait) if wait and wait.isdigit() else 5 * (attempt + 1))
+            time.sleep(float(wait) if wait and wait.isdigit() else 10 * (attempt + 1))
             continue
         res.raise_for_status()
         return res.json()
@@ -118,8 +125,19 @@ def find_artwork_image(
     artists: list[str],
     session: requests.Session | None = None,
 ) -> str | None:
-    """Image URL of the artwork named by any of `titles` by one of `artists`."""
-    http = session or requests.Session()
+    """Image URL of the artwork named by any of `titles` by one of `artists`.
+
+    None when no matching image is found, or when Wikimedia stays unreachable
+    (rate limited) after retries: the item is then left out, and the rest of
+    the batch goes on.
+    """
+    try:
+        return _find_artwork_image(titles, artists, session or requests.Session())
+    except requests.RequestException:
+        return None
+
+
+def _find_artwork_image(titles: list[str], artists: list[str], http: requests.Session) -> str | None:
     for title in [t for t in titles if t]:
         for language in ("en", "ja"):
             found = _get(http, WIKIDATA_API, {
