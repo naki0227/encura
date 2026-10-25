@@ -9,7 +9,9 @@ Checks are skipped when their settings are missing, and the run fails when any
 check fails. Results go to stdout and, in Actions, to the job summary.
 
 Environment:
-  GEMINI_API_KEY, GEMINI_MODEL     Gemini (same as the crawlers)
+  GEMINI_API_KEY, GEMINI_MODEL     Gemini key and model list (same values as the
+                                   curator Edge Function); only lists models,
+                                   which costs nothing
   SUPABASE_URL, SUPABASE_ANON_KEY  Supabase REST and the curator Edge Function
   IMAGE_OPTIMIZER_URL              Rust image optimizer /process endpoint
 """
@@ -77,34 +79,13 @@ def check_gemini_models(http: requests.Session) -> Check:
     return Check(name, OK, f"{', '.join(present)} available")
 
 
-@named('Gemini: generate')
-def check_gemini_generate(_: requests.Session) -> Check:
-    name = check_gemini_generate.label
-    if not env("GEMINI_API_KEY"):
-        return Check(name, SKIP, "GEMINI_API_KEY not set")
-    result = gemini.generate("「モナ・リザ」の作者の名前だけを日本語で答えてください。")
-    if "ダ・ヴィンチ" not in result.text and "ダヴィンチ" not in result.text:
-        return Check(name, WARN, f"{result.model} answered unexpectedly: {result.text[:80]!r}")
-    return Check(name, OK, f"{result.model} answered")
-
-
-@named('Gemini: search grounding')
-def check_gemini_search(_: requests.Session) -> Check:
-    """The crawlers depend on Google Search grounding."""
-    name = check_gemini_search.label
-    if not env("GEMINI_API_KEY"):
-        return Check(name, SKIP, "GEMINI_API_KEY not set")
-    result = gemini.generate("東京国立博物館の公式サイトの URL を検索して答えてください。", search=True)
-    if not result.sources:
-        return Check(name, FAIL, f"{result.model} returned no web sources; crawlers cannot verify content")
-    return Check(name, OK, f"{result.model}, {len(result.sources)} sources")
-
-
 # --- Supabase ---------------------------------------------------------------
 
 def _supabase_headers() -> dict:
-    key = env("SUPABASE_ANON_KEY")
-    return {"apikey": key, "Authorization": f"Bearer {key}"}
+    # The apikey header alone is enough for both the legacy anon key (a JWT)
+    # and the newer publishable key (sb_publishable_..., not a JWT, so it must
+    # not be sent as a Bearer token).
+    return {"apikey": env("SUPABASE_ANON_KEY")}
 
 
 @named('Supabase: database and content')
@@ -137,7 +118,7 @@ def check_supabase_content(http: requests.Session) -> Check:
     if news.status_code == 200 and not news.json():
         problems.append("no news in the last 7 days")
     if problems:
-        return Check(name, WARN, "; ".join(problems) + " (check the Daily Art Crawler runs)")
+        return Check(name, WARN, "; ".join(problems) + " (check the daily content routine and DB Migrations runs)")
     return Check(name, OK, "reachable, content is current")
 
 
@@ -168,7 +149,7 @@ def check_content_images(http: requests.Session) -> Check:
                 broken.append(row["title"])
     if broken:
         return Check(name, WARN, f"{len(broken)}/{checked} images do not load: {', '.join(broken[:5])} "
-                                 "(run scripts/fix_image_urls.py --apply)")
+                                 "(the source file may have moved; fix the row with a migration)")
     return Check(name, OK, f"{checked} images load")
 
 
@@ -188,7 +169,7 @@ def check_curator_function(http: requests.Session) -> Check:
         return Check(name, FAIL, f"anonymous sign-in failed: HTTP {auth.status_code} {auth.text[:150]}")
     res = http.post(f"{base}/functions/v1/curator",
                     json={"task": "chat", "message": "「睡蓮」で知られる画家は誰ですか？一言で。"},
-                    headers={"apikey": env("SUPABASE_ANON_KEY"), "Authorization": f"Bearer {token}"},
+                    headers={**_supabase_headers(), "Authorization": f"Bearer {token}"},
                     timeout=TIMEOUT)
     if res.status_code != 200:
         return Check(name, FAIL, f"HTTP {res.status_code}: {res.text[:150]} (see function logs)")
@@ -219,8 +200,6 @@ def check_image_optimizer(http: requests.Session) -> Check:
 
 CHECKS: list[Callable[[requests.Session], Check]] = [
     check_gemini_models,
-    check_gemini_generate,
-    check_gemini_search,
     check_supabase_content,
     check_content_images,
     check_curator_function,

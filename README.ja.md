@@ -25,7 +25,7 @@
 **EnCura** は、美術館での鑑賞体験をAI技術で拡張するモバイルアプリケーションです。
 単なる音声ガイドではありません。カメラで作品を認識して解説するだけでなく、**「トイレはどこ？」といった館内案内から、「この絵の背景は？」という深い美術談義まで**、専属のAI学芸員が24時間対話形式でサポートします。
 
-また、**GitHub Actionsによる自律型クローラー** が毎日最新の展覧会情報を収集し、データベースを自動更新するため、運用コストゼロで常に鮮度が高い情報をユーザーに提供します。
+また、**毎日動く Claude の定期実行** が展覧会・今日の一枚・美術ニュースを調べ、公式の出典で確かめられたものだけを、日時入りの SQL マイグレーションとして CI が DB に反映します。
 
 ## ✨ 主な機能 (Key Features)
 
@@ -43,7 +43,7 @@
 
 ### 4. 📰 Auto Event Hunter (完全自動収集)
 * **概要:** 毎日朝9時に、日本国内の展覧会情報を自動収集・更新。
-* **技術:** `GitHub Actions` + `Python` クローラー。非構造化テキストをGeminiでJSONに変換し、`PostGIS` 対応のDBへ格納。
+* **技術:** Claude の定期実行が候補を集め、`scripts/content/build_migration.py` が公式ページの確認・会場の住所の座標化（国土地理院）・作品画像の確認（Wikidata）を行い、`supabase/migrations/` に日時入りのマイグレーションを書く。GitHub Actions が `PostGIS` 対応の DB に反映。
 
 ### 5. 🎨 Today's Art & Trends
 * **概要:** 毎日更新される名画コラムと、SNSで話題のアートトピック配信。
@@ -62,7 +62,7 @@
 | **Backend (Microservice)** | **Rust (Actix-web)** | 高負荷な画像処理（リサイズ・圧縮・プライバシー加工）を担当するCloud Runサービス |
 | **Database** | **PostgreSQL** | `PostGIS` (位置情報), `pgvector` (AI検索用) |
 | **AI Model** | **Google Gemini 2.5** | Flash (リアルタイム応答), Pro (バッチ処理) |
-| **DevOps** | **GitHub Actions** | 定期実行クローラー (Python), CI/CD |
+| **DevOps** | **GitHub Actions** | DB マイグレーション、点検、TestFlight、CI |
 | **Development** | **AI-Assisted** | Gemini 2.5のコード生成を活用し、**コアロジック（クローラーや位置情報処理）の実装に人間のリソースを集中** |
 
 ---
@@ -74,38 +74,20 @@
 
 ```text
 encura/
-├── .github/                 # CI/CD Workflows (Actions)
-│   └── workflows/           # Build, Test, Deploy definitions
-│
-├── app/                     # Mobile Application (Flutter)
-│   ├── assets/              # Static Assets (Images, Icons)
-│   └── lib/
-│       ├── core/            # 共通ユーティリティ・設定 (Env, Theme, Logger)
-│       ├── features/        # 機能単位の構成 (Feature-first Architecture)
-│       │   ├── art_guide/   # AI作品解説機能
-│       │   ├── map/         # 館内マップ・ナビゲーション機能
-│       │   └── chat/        # AI学芸員チャット機能
-│       │       ├── data/          # Repository & Data Source
-│       │       ├── domain/        # Entity & UseCase
-│       │       └── presentation/  # UI & State (Riverpod)
-│       └── main.dart
-│
-├── microservices/           # High-Performance Services
-│   └── rust_optimizer/      # 画像処理専用マイクロサービス (Rust/Actix-web)
-│       ├── src/
-│       ├── Cargo.toml
-│       └── Dockerfile
-│
-├── crawler/                 # Data Collection Bot
-│   ├── app/                 # 展覧会情報収集クローラー (Python)
-│   ├── requirements.txt
-│   └── Dockerfile
-│
-└── supabase/                # Backend Infrastructure (BaaS)
-    ├── functions/           # Edge Functions (TypeScript/Deno)
-    │   └── embed_vector/    # Gemini Embeddings生成用
-    ├── migrations/          # Database Schema & RLS Policies (SQL)
-    └── seed.sql             # Initial Data
+├── .github/workflows/       # CI、DB マイグレーション、点検、TestFlight
+├── lib/                     # Flutter アプリ
+│   ├── core/                # 設定・サービス・リポジトリ・モデル
+│   └── ui/                  # 画面とウィジェット
+├── test/                    # Flutter のテスト
+├── image_optimizer/         # 画像処理マイクロサービス (Rust/Actix-web, Cloud Run)
+├── scripts/
+│   ├── content/             # 毎日のコンテンツを確かめてマイグレーションにする
+│   ├── health_check.py      # 外部依存の点検
+│   └── ios/archive.sh       # iOS のアーカイブと TestFlight へのアップロード
+├── supabase/
+│   ├── functions/curator/   # Gemini を呼ぶ Edge Function (TypeScript/Deno)
+│   └── migrations/          # スキーマとコンテンツ（日時入りのマイグレーション）
+└── docs/                    # 診断・リリース手順・毎日のコンテンツ更新の手順
 ```
 
 ```mermaid
@@ -128,8 +110,8 @@ graph TD
     end
     
     subgraph "Automation (GitHub)"
-        Crawler["🤖 Python Crawler"]
-        Actions["GitHub Actions (Cron)"]
+        Routine["🤖 Daily Claude routine"]
+        Actions["GitHub Actions"]
     end
 
     %% Flows
@@ -140,9 +122,8 @@ graph TD
     User -->|Read / Write| DB
     User -->|Upload Maps| Storage
     
-    Actions -->|Trigger daily| Crawler
-    Crawler -->|Fetch Info| Gemini
-    Crawler -->|Upsert Data| DB
+    Routine -->|Content migration PR| Actions
+    Actions -->|Apply migrations| DB
 ```
 
 ### 🦀 Rust Microservice Strategy

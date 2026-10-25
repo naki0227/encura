@@ -25,7 +25,7 @@
 **EnCura** is a mobile application that extends the museum viewing experience with AI technology.
 It is not just an audio guide. From simple guidance like "Where is the restroom?" to deep art discussions like "What is the historical background of this painting?", your personal AI curator provides 24/7 conversational support. It recognizes artworks via camera and provides instant explanations.
 
-In addition, an **autonomous crawler using GitHub Actions** automatically collects and updates exhibition information daily, ensuring users always have access to the freshest information with zero operational cost.
+In addition, a **daily Claude routine** researches exhibitions, Today's Art and art news, and only content whose official source page could be checked is published, as versioned SQL migrations applied by CI.
 
 ## ✨ Key Features
 
@@ -43,7 +43,7 @@ In addition, an **autonomous crawler using GitHub Actions** automatically collec
 
 ### 4. 📰 Auto Event Hunter (Fully Automated Collection)
 *   **Overview:** Automatically collects and updates exhibition information across Japan every morning at 9:00 AM.
-*   **Technology:** `GitHub Actions` + `Python` crawler. Unstructured text is converted to JSON by Gemini and stored in a `PostGIS`-enabled DB.
+*   **Technology:** A scheduled Claude routine researches candidates; `scripts/content/build_migration.py` checks each official page, geocodes venues (GSI) and finds artwork images (Wikidata), then writes a dated migration in `supabase/migrations/` that GitHub Actions applies to the `PostGIS`-enabled DB.
 
 ### 5. 🎨 Today's Art & Trends
 *   **Overview:** Daily updates of masterpiece columns and trending art topics from social media.
@@ -62,7 +62,7 @@ We adopt a modern and scalable configuration.
 | **Backend (Microservice)** | **Rust (Actix-web)** | Cloud Run service handling high-load image processing (resize/compress/privacy) |
 | **Database** | **PostgreSQL** | `PostGIS` (Location), `pgvector` (AI Search) |
 | **AI Model** | **Google Gemini 2.5** | Flash (Real-time response), Pro (Batch processing) |
-| **DevOps** | **GitHub Actions** | Scheduled crawler (Python), CI/CD |
+| **DevOps** | **GitHub Actions** | DB migrations, health check, TestFlight, CI |
 | **Development** | **AI-Assisted** | Leveraging Gemini 2.5 code generation to **focus human resources on core logic implementation** |
 
 ---
@@ -89,8 +89,8 @@ graph TD
     end
     
     subgraph "Automation (GitHub)"
-        Crawler["🤖 Python Crawler"]
-        Actions["GitHub Actions (Cron)"]
+        Routine["🤖 Daily Claude routine"]
+        Actions["GitHub Actions"]
     end
 
     %% Flows
@@ -101,9 +101,8 @@ graph TD
     User -->|Read / Write| DB
     User -->|Upload Maps| Storage
     
-    Actions -->|Trigger daily| Crawler
-    Crawler -->|Fetch Info| Gemini
-    Crawler -->|Upsert Data| DB
+    Routine -->|Content migration PR| Actions
+    Actions -->|Apply migrations| DB
 ```
 
 ### 🦀 Rust Microservice Strategy
