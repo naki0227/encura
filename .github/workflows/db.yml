@@ -1,0 +1,122 @@
+name: DB Migrations
+
+# supabase/migrations/<UTC timestamp>_<name>.sql is the only way the database
+# changes. Supabase records each applied version in
+# supabase_migrations.schema_migrations, so every change is versioned and
+# applied exactly once.
+#
+# - Pull requests: apply every migration to a throwaway local Supabase
+#   database. Content PRs from the daily routine (claude/content-*) are also
+#   gated by scripts/content/check_migration.py and merged automatically.
+# - main: push pending migrations to the production database and deploy the
+#   Edge Function.
+on:
+  pull_request:
+    paths: [ 'supabase/**', 'scripts/content/**', '.github/workflows/db.yml' ]
+  push:
+    branches: [ main ]
+    paths: [ 'supabase/migrations/**', 'supabase/functions/**' ]
+  workflow_dispatch:
+
+concurrency:
+  group: db-${{ github.event_name == 'pull_request' && github.head_ref || 'production' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install -r scripts/requirements.txt
+
+      - name: Apply all migrations to a local database
+        run: supabase db start
+
+      - name: A generated content migration applies, twice
+        run: |
+          mkdir -p "$RUNNER_TEMP/sample"
+          python scripts/content/build_migration.py scripts/content/sample_candidates.json \
+            --out-dir "$RUNNER_TEMP/sample" --offline
+          # Connection string of the throwaway local database started above.
+          db_url=$(supabase status -o env | sed -n 's/^DB_URL="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p')
+          for i in 1 2; do
+            psql "$db_url" -v ON_ERROR_STOP=1 -q -f "$RUNNER_TEMP"/sample/*.sql
+          done
+
+      - name: Content PR may only add content migrations
+        if: startsWith(github.head_ref, 'claude/content-')
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          changed=$(git diff --name-only --diff-filter=AMDR "$BASE_SHA"...HEAD)
+          echo "$changed"
+          added_only=$(git diff --name-only --diff-filter=A "$BASE_SHA"...HEAD)
+          if [ "$changed" != "$added_only" ]; then
+            echo "::error::content PRs may only add files"; exit 1
+          fi
+          python scripts/content/check_migration.py $changed
+
+  auto-merge:
+    needs: validate
+    if: >-
+      github.event_name == 'pull_request' &&
+      startsWith(github.head_ref, 'claude/content-') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Merge
+        run: gh pr merge "${{ github.event.pull_request.number }}" --merge --repo "$GITHUB_REPOSITORY"
+      # A merge made with GITHUB_TOKEN does not start push workflows, so
+      # start the production apply explicitly.
+      - name: Apply to production
+        run: gh workflow run db.yml --ref main --repo "$GITHUB_REPOSITORY"
+
+  apply:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+
+      - name: Push pending migrations
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::SUPABASE_DB_URL is not set (see docs/RELEASE.md)"; exit 1
+          fi
+          supabase migration list --db-url "$SUPABASE_DB_URL"
+          # --include-all: a schema migration written on a branch can carry an
+          # older timestamp than content applied since; apply it anyway.
+          supabase db push --db-url "$SUPABASE_DB_URL" --include-all
+
+      - name: Deploy the curator Edge Function
+        if: ${{ env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != '' }}
+        run: supabase functions deploy curator --project-ref "$SUPABASE_PROJECT_REF"

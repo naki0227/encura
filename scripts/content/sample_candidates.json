@@ -1,0 +1,28 @@
+{
+  "exhibitions": [
+    {
+      "title": "特別展「例示の美術」",
+      "venue": "東京国立博物館",
+      "venue_address": "東京都台東区上野公園13-9",
+      "start_date": "2026-10-01",
+      "end_date": "2026-12-01",
+      "official_url": "https://www.tnm.jp/",
+      "sources": [],
+      "summary": "公式サイトに書かれている概要を100字程度で。"
+    }
+  ],
+  "daily_art": [
+    {"title": "星月夜", "title_en": "The Starry Night", "artist": "フィンセント・ファン・ゴッホ", "artist_en": "Vincent van Gogh", "content": "作品の背景と見どころを200字程度で。"}
+  ],
+  "news": [
+    {
+      "title": "見出し（30字以内）",
+      "summary": "50字程度の要約",
+      "content": "出典に書かれている事実だけで200〜300字",
+      "source_url": "https://example.com/article",
+      "subject": "出典に載っている固有名詞",
+      "keyword": "展覧会",
+      "artwork": null
+    }
+  ]
+}

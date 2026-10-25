@@ -2,8 +2,8 @@ name: Health Check
 
 on:
   schedule:
-    # JST 8:30 = UTC 23:30, before the crawler at JST 9:00
-    - cron: '30 23 * * *'
+    # JST 10:30 = UTC 1:30, after the daily content routine has been merged
+    - cron: '30 1 * * *'
   workflow_dispatch:
 
 permissions:
@@ -35,15 +35,12 @@ jobs:
         run: python scripts/health_check.py
 
       # GitHub disables scheduled workflows after 60 days without repository
-      # activity; that is what silently stopped the crawler in 2026-03.
-      - name: Keep scheduled workflows enabled
+      # activity; that is what silently stopped the old crawler in 2026-03.
+      - name: Keep this schedule enabled
         if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          for wf in daily_crawler.yml health_check.yml; do
-            gh workflow enable "$wf" --repo "$GITHUB_REPOSITORY" || echo "could not enable $wf"
-          done
+        run: gh workflow enable health_check.yml --repo "$GITHUB_REPOSITORY" || echo "could not enable"
 
       - name: Report failure as an issue
         if: ${{ failure() }}

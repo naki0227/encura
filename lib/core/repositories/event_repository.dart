@@ -11,7 +11,7 @@ class EventRepository {
       final today = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
       final response = await _client
           .from('events')
-          .select('id, title, venue, location, description_json, source_url, start_date, end_date')
+          .select('id, title, venue, venue_id, location, description_json, source_url, start_date, end_date')
           .gte('end_date', today)
           .order('start_date', ascending: true);
       
