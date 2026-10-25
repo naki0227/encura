@@ -88,6 +88,11 @@ def _supabase_headers() -> dict:
     return {"apikey": env("SUPABASE_ANON_KEY")}
 
 
+def _today_jst() -> dt.date:
+    """Content dates are Japan dates (the routine, the migrations and the app use them)."""
+    return dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).date()
+
+
 @named('Supabase: database and content')
 def check_supabase_content(http: requests.Session) -> Check:
     """Project is up, and the content the app shows is current."""
@@ -95,7 +100,7 @@ def check_supabase_content(http: requests.Session) -> Check:
     if not (env("SUPABASE_URL") and env("SUPABASE_ANON_KEY")):
         return Check(name, SKIP, "SUPABASE_URL / SUPABASE_ANON_KEY not set")
     base = env("SUPABASE_URL").rstrip("/") + "/rest/v1"
-    today = dt.date.today().isoformat()
+    today = _today_jst().isoformat()
     try:
         daily = http.get(f"{base}/daily_columns", params={"select": "display_date", "display_date": f"eq.{today}"},
                          headers=_supabase_headers(), timeout=TIMEOUT)
@@ -111,7 +116,7 @@ def check_supabase_content(http: requests.Session) -> Check:
                       headers=_supabase_headers(), timeout=TIMEOUT)
     if events.status_code == 200 and not events.json():
         problems.append("no current exhibitions")
-    week_ago = (dt.date.today() - dt.timedelta(days=7)).isoformat()
+    week_ago = (_today_jst() - dt.timedelta(days=7)).isoformat()
     news = http.get(f"{base}/trending_articles",
                     params={"select": "id", "created_at": f"gte.{week_ago}", "limit": "1"},
                     headers=_supabase_headers(), timeout=TIMEOUT)
@@ -129,7 +134,7 @@ def check_content_images(http: requests.Session) -> Check:
     if not (env("SUPABASE_URL") and env("SUPABASE_ANON_KEY")):
         return Check(name, SKIP, "SUPABASE_URL / SUPABASE_ANON_KEY not set")
     base = env("SUPABASE_URL").rstrip("/") + "/rest/v1"
-    today = dt.date.today().isoformat()
+    today = _today_jst().isoformat()
     queries = [
         ("daily_columns", {"select": "title,image_url", "display_date": f"lte.{today}",
                            "order": "display_date.desc", "limit": "7"}),
