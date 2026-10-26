@@ -61,7 +61,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Verifying image with AI...')),
+      const SnackBar(content: Text('AIでマップか確かめています…')),
     );
 
     final File imageFile = File(image.path);
@@ -71,7 +71,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
     if (result == MapUploadResult.uploaded) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Map verified and uploaded!')),
+        const SnackBar(content: Text('マップを投稿しました')),
       );
       _loadMaps(); // Refresh list
     } else {
@@ -79,10 +79,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text(notMap ? 'Not a Map' : 'Upload Failed'),
+          title: Text(notMap ? 'マップではないようです' : '投稿できませんでした'),
           content: Text(notMap
-              ? 'AI determined that this image is not a map or floor guide. Please try again.'
-              : 'Could not upload the map. Please check your connection and try again.'),
+              ? 'AIの判定では、館内マップや案内図ではありませんでした。別の写真でお試しください。'
+              : 'マップを投稿できませんでした。通信状況を確かめて、もう一度お試しください。'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -230,7 +230,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         ElevatedButton.icon(
                           onPressed: _launchMap,
                           icon: const Icon(Icons.map, size: 18),
-                          label: const Text("Map"),
+                          label: const Text('地図'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Theme.of(context).primaryColor,
                             foregroundColor: Colors.black,
@@ -267,7 +267,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       child: OutlinedButton.icon(
                         onPressed: _launchOfficialSite,
                         icon: const Icon(Icons.language),
-                        label: const Text("Visit Official Site"),
+                        label: const Text('公式サイト'),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           side: BorderSide(color: Theme.of(context).primaryColor),
@@ -317,7 +317,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                           ElevatedButton.icon(
                             onPressed: _scanAndUploadMap,
                             icon: const Icon(Icons.camera_alt),
-                            label: const Text("Scan Venue Map"),
+                            label: const Text('館内マップを撮る'),
                           ),
                         ],
                       ),

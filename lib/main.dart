@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'core/services/supabase_service.dart';
 import 'ui/screens/home/home_screen.dart';
 import 'ui/screens/chat/chat_screen.dart';
+import 'ui/theme/tokens.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,9 +20,9 @@ class EnCuraApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFFC5A059);
-    const backgroundColor = Color(0xFF121212);
-    const surfaceColor = Color(0xFF1E1E1E);
+    const primaryColor = Palette.gold;
+    const backgroundColor = Palette.room;
+    const surfaceColor = Palette.frame;
 
     return MaterialApp(
       title: 'EnCura',
@@ -45,16 +46,38 @@ class EnCuraApp extends StatelessWidget {
           centerTitle: true,
           elevation: 0,
         ),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: backgroundColor,
-          selectedItemColor: primaryColor,
-          unselectedItemColor: Colors.grey,
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: Palette.wall,
+          indicatorColor: primaryColor.withValues(alpha: 0.16),
+          height: 64,
+          iconTheme: WidgetStateProperty.resolveWith(
+            (states) => IconThemeData(
+              color: states.contains(WidgetState.selected) ? primaryColor : Palette.textSub,
+            ),
+          ),
+          labelTextStyle: WidgetStateProperty.resolveWith(
+            (states) => TextStyle(
+              fontSize: 11,
+              letterSpacing: 1,
+              color: states.contains(WidgetState.selected) ? Palette.text : Palette.textSub,
+            ),
+          ),
         ),
         cardTheme: CardThemeData(
           color: surfaceColor,
-          elevation: 4,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+            side: const BorderSide(color: Palette.line),
+          ),
         ),
+        dividerColor: Palette.line,
+        snackBarTheme: const SnackBarThemeData(
+          backgroundColor: Palette.frame,
+          contentTextStyle: TextStyle(color: Palette.text),
+          behavior: SnackBarBehavior.floating,
+        ),
+
       ),
       home: const MainScreen(),
     );
@@ -120,7 +143,7 @@ class _MainScreenState extends State<MainScreen> {
               InkWell(
                 child: Text(
                   '利用規約・プライバシーポリシーを確認する',
-                  style: TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
+                  style: TextStyle(color: Palette.gold, decoration: TextDecoration.underline),
                 ),
                 onTap: () async {
                   final Uri url = Uri.parse('https://enludus.com/products/encura-terms');
@@ -154,7 +177,13 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_selectedIndex],
+      // Switching tabs cross-fades instead of cutting (.36s, one curve).
+      body: AnimatedSwitcher(
+        duration: Motion.reduced(context) ? Duration.zero : Motion.mid,
+        switchInCurve: Motion.curve,
+        switchOutCurve: Motion.curve,
+        child: KeyedSubtree(key: ValueKey(_selectedIndex), child: _screens[_selectedIndex]),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: _onItemTapped,
@@ -162,12 +191,12 @@ class _MainScreenState extends State<MainScreen> {
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
-            label: 'Home',
+            label: 'ホーム',
           ),
           NavigationDestination(
             icon: Icon(Icons.chat_bubble_outline),
             selectedIcon: Icon(Icons.chat_bubble),
-            label: 'Curator',
+            label: '学芸員',
           ),
         ],
       ),

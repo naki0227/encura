@@ -16,6 +16,8 @@ class ChatMessage {
 }
 
 class ChatViewModel extends ChangeNotifier {
+  static const _failureMessage = '答えを受け取れませんでした。通信状況を確かめて、もう一度お試しください。';
+
   final ChatService _chatService = ChatService();
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
@@ -64,7 +66,8 @@ class ChatViewModel extends ChangeNotifier {
       final response = await _chatService.sendMessage(text);
       _messages.add(ChatMessage(text: response, isUser: false));
     } catch (e) {
-      _messages.add(ChatMessage(text: 'Error: $e', isUser: false));
+      debugPrint('Curator request failed: $e');
+      _messages.add(ChatMessage(text: _failureMessage, isUser: false));
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -86,7 +89,7 @@ class ChatViewModel extends ChangeNotifier {
       final imageBytes = await image.readAsBytes();
       
       _messages.add(ChatMessage(
-        text: 'Analyzing...',
+        text: 'この作品について教えて',
         isUser: true,
         imageBytes: imageBytes,
       ));
@@ -100,7 +103,8 @@ class ChatViewModel extends ChangeNotifier {
       
       _messages.add(ChatMessage(text: response, isUser: false));
     } catch (e) {
-      _messages.add(ChatMessage(text: 'Error: $e', isUser: false));
+      debugPrint('Curator request failed: $e');
+      _messages.add(ChatMessage(text: _failureMessage, isUser: false));
     } finally {
       _isLoading = false;
       notifyListeners();

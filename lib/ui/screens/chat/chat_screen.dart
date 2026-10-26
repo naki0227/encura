@@ -1,8 +1,9 @@
 import 'dart:typed_data';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'chat_view_model.dart';
+import '../../theme/tokens.dart';
+import '../../widgets/motion.dart';
 
 class ChatScreen extends StatelessWidget {
   final String? initialImageUrl;
@@ -27,6 +28,77 @@ class _ChatScreenContent extends StatefulWidget {
 
 class _ChatScreenContentState extends State<_ChatScreenContent> {
   final TextEditingController _controller = TextEditingController();
+  final Set<Object> _revealed = {};
+
+  static const _suggestions = [
+    '印象派ってどんな絵？',
+    '浮世絵の見どころを教えて',
+    '美術館を楽しむコツは？',
+    '仏像の見分け方を知りたい',
+  ];
+
+  void _send(ChatViewModel viewModel, String text) {
+    if (text.trim().isEmpty) return;
+    viewModel.sendMessage(text.trim());
+    _controller.clear();
+  }
+
+  Widget _buildIntro(BuildContext context, ChatViewModel viewModel) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(28, 100, 28, 24),
+        child: Reveal(
+          id: 'intro',
+          seen: _revealed,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'ASK THE CURATOR',
+                style: TextStyle(fontFamily: 'Helvetica', fontSize: 11, letterSpacing: 2.4, color: Palette.gold),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '作品のこと、\nなんでも聞いてください。',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Palette.text,
+                      fontWeight: FontWeight.w700,
+                      height: 1.5,
+                      letterSpacing: 1,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '左下のカメラで作品を撮ると、その作品を解説します。',
+                style: TextStyle(color: Palette.textSub, fontSize: 13, height: 1.8),
+              ),
+              const SizedBox(height: 28),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final q in _suggestions)
+                    Pressable(
+                      onTap: () => _send(viewModel, q),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Palette.line),
+                          color: Palette.wall,
+                        ),
+                        child: Text(q, style: const TextStyle(color: Palette.text, fontSize: 13)),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +107,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Anytime Curator'),
+        title: const Text('学芸員に聞く'),
         backgroundColor: Colors.transparent,
         elevation: 0,
         flexibleSpace: Container(
@@ -53,25 +125,22 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
       ),
       body: Stack(
         children: [
-          // Washi Texture Background
-          Positioned.fill(
-            child: CustomPaint(
-              painter: WashiTexturePainter(
-                baseColor: Theme.of(context).scaffoldBackgroundColor,
-                textureColor: Colors.white.withValues(alpha: 0.05),
-              ),
-            ),
-          ),
           Column(
             children: [
               Expanded(
-                child: ListView.builder(
+                child: viewModel.messages.isEmpty && !viewModel.isLoading
+                    ? _buildIntro(context, viewModel)
+                    : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 100, 16, 16),
                   itemCount: viewModel.messages.length,
                   itemBuilder: (context, index) {
                     final message = viewModel.messages[index];
                     final isUser = message.isUser;
-                    return Padding(
+                    return Reveal(
+                      id: index,
+                      seen: _revealed,
+                      offset: 12,
+                      child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12.0),
                       child: Row(
                         mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
@@ -147,6 +216,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                           ),
                         ],
                       ),
+                    ),
                     );
                   },
                 ),
@@ -157,14 +227,15 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                   child: Center(
                     child: CircularProgressIndicator(
                       color: Theme.of(context).primaryColor,
+                      strokeWidth: 2,
                     ),
                   ),
                 ),
               Container(
                 padding: const EdgeInsets.all(16.0),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.9),
-                  border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
+                decoration: const BoxDecoration(
+                  color: Palette.wall,
+                  border: Border(top: BorderSide(color: Palette.line)),
                 ),
                 child: Row(
                   children: [
@@ -178,7 +249,7 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                         controller: _controller,
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
-                          hintText: 'Ask about art...',
+                          hintText: '作品について質問する…',
                           hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                           filled: true,
                           fillColor: Colors.white.withValues(alpha: 0.05),
@@ -188,23 +259,13 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
                           ),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                         ),
-                        onSubmitted: (value) {
-                          if (value.isNotEmpty) {
-                            viewModel.sendMessage(value);
-                            _controller.clear();
-                          }
-                        },
+                        onSubmitted: (value) => _send(viewModel, value),
                       ),
                     ),
                     const SizedBox(width: 8),
                     IconButton(
                       icon: Icon(Icons.send, color: Theme.of(context).primaryColor),
-                      onPressed: () {
-                        if (_controller.text.isNotEmpty) {
-                          viewModel.sendMessage(_controller.text);
-                          _controller.clear();
-                        }
-                      },
+                      onPressed: () => _send(viewModel, _controller.text),
                     ),
                   ],
                 ),
@@ -215,35 +276,4 @@ class _ChatScreenContentState extends State<_ChatScreenContent> {
       ),
     );
   }
-}
-
-class WashiTexturePainter extends CustomPainter {
-  final Color baseColor;
-  final Color textureColor;
-
-  WashiTexturePainter({required this.baseColor, required this.textureColor});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = baseColor;
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), paint);
-
-    final noisePaint = Paint()
-      ..color = textureColor
-      ..style = PaintingStyle.fill;
-
-    // Simple noise generation (simulated)
-    // In a real app, you might use an image shader or a more complex noise algorithm.
-    // Here we draw random small circles to simulate paper fibers.
-    final random = Random(42); // Fixed seed for consistency
-    for (int i = 0; i < 5000; i++) {
-      final x = random.nextDouble() * size.width;
-      final y = random.nextDouble() * size.height;
-      final radius = random.nextDouble() * 1.5;
-      canvas.drawCircle(Offset(x, y), radius, noisePaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -32,7 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not launch $url')),
+          SnackBar(content: Text('ページを開けませんでした')),
         );
       }
     }
@@ -75,7 +75,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: const Text('設定'),
       ),
       body: ListView(
         children: [

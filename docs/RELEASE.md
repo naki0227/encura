@@ -89,7 +89,7 @@ DB の鍵は Claude に渡しません。Routine の作成は、手順 1〜4 が
 
 1. 手順 1〜4 が済んでいることを確認する。
 2. **Actions → iOS Release (TestFlight) → Run workflow** を実行する。
-   - `build_number` は空なら `pubspec.yaml` の値（今回は 8。7 は 2026-10-26 にアップロード済み）。同じ番号は二度上げられないので、作り直すときは 8, 9… を入れる。
+   - `build_number` は空なら `pubspec.yaml` の値（今回は 9。7・8 は 2026-10-26 にアップロード済み）。同じ番号は二度上げられないので、作り直すときは 8, 9… を入れる。
    - `v1.0.5` のようなタグを push しても動きます。
    - 初回は GitHub の Environment「release」が自動で作られます。承認者を付けたい場合は **Settings → Environments → release** で設定します。
 3. 15〜30 分ほどで、App Store Connect の TestFlight にビルドが出ます。輸出コンプライアンスは Info.plist で「該当なし（HTTPS のみ）」と申告済みなので、そのままテスターに配れます。
@@ -97,7 +97,7 @@ DB の鍵は Claude に渡しません。Routine の作成は、手順 1〜4 が
    - ホームに今日の一枚・トレンドが出る
    - Curator タブで質問すると日本語で答える
    - カメラで作品を撮ると解説が返る
-   - 会場詳細でマップを撮ると「Map verified and uploaded!」になる
+   - 会場詳細でマップを撮ると「マップを投稿しました」になる
    - 展覧会詳細の地図ボタンが正しい場所を開く
 
 手元の Mac でビルドする場合は `scripts/ios/archive.sh config/prod.json build` を使えます（API キーの環境変数がなければ、署名なしのアーカイブだけを作ります）。

@@ -92,7 +92,7 @@ class _VenueSearchScreenState extends State<VenueSearchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Find Museums'),
+        title: const Text('美術館を探す'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Padding(
@@ -103,7 +103,7 @@ class _VenueSearchScreenState extends State<VenueSearchScreen> {
                   child: TextField(
                     controller: _searchController,
                     decoration: InputDecoration(
-                      hintText: 'Search museums...',
+                      hintText: '美術館の名前で探す',
                       prefixIcon: const Icon(Icons.search),
                       filled: true,
                       fillColor: Theme.of(context).cardColor,
@@ -136,7 +136,7 @@ class _VenueSearchScreenState extends State<VenueSearchScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _venues.isEmpty
-              ? const Center(child: Text('No museums found'))
+              ? const Center(child: Text('見つかりませんでした'))
               : ListView.builder(
                   itemCount: _venues.length,
                   itemBuilder: (context, index) {
@@ -144,7 +144,7 @@ class _VenueSearchScreenState extends State<VenueSearchScreen> {
                     return ListTile(
                       leading: const Icon(Icons.account_balance),
                       title: Text(venue['name'] ?? 'Unknown'),
-                      subtitle: Text(venue['address'] ?? 'No address info'),
+                      subtitle: Text(venue['address'] ?? '住所の情報がありません'),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () {
                         Navigator.push(

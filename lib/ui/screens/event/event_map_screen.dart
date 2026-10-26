@@ -25,7 +25,7 @@ class _EventMapScreenContent extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI Event Hunter'),
+        title: const Text('展覧会マップ'),
       ),
       body: viewModel.isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -67,7 +67,7 @@ class _EventMapScreenContent extends StatelessWidget {
                                       const SizedBox(height: 8),
                                       Text(event.venue, style: Theme.of(context).textTheme.titleMedium),
                                       const SizedBox(height: 8),
-                                      Text(event.summary ?? 'No description'),
+                                      Text(event.summary ?? '説明はありません'),
                                     ],
                                   ),
                                 ),
