@@ -28,8 +28,16 @@ class FakeChecks(bm.Checks):
 
 def checks_for_sample():
     return FakeChecks(
-        pages={"https://www.tnm.jp/": "東京国立博物館 特別展「例示の美術」", "https://example.com/article": "出典に載っている固有名詞"},
-        images={"The Starry Night": "https://upload.wikimedia.org/starry.jpg"},
+        pages={
+            "https://www.tnm.jp/": "東京国立博物館 特別展「例示の美術」",
+            "https://example.com/article": "出典に載っている固有名詞",
+            "https://ja.wikipedia.org/wiki/写実主義": "写実主義",
+            "https://ja.wikipedia.org/wiki/印象派": "印象派",
+        },
+        images={
+            "The Starry Night": "https://upload.wikimedia.org/starry.jpg",
+            "Impression, Sunrise": "https://upload.wikimedia.org/sunrise.jpg",
+        },
         coords=(35.717556, 139.775543),
     )
 
@@ -37,13 +45,15 @@ def checks_for_sample():
 def test_sample_produces_a_migration_that_passes_the_gate(tmp_path):
     body, report = bm.build(SAMPLE, NOW, checks_for_sample())
     assert body.startswith(bm.GENERATED_MARK)
-    assert len(report.accepted) == 4 and not report.rejected
+    assert len(report.accepted) == 8 and not report.rejected
     assert "POINT(139.775543 35.717556)" in body
     assert cm.statement_problems(body) == []
 
 
 def test_unverified_items_are_rejected_not_written():
-    body, report = bm.build(SAMPLE, NOW, FakeChecks())
+    # Links need no network check (both ends must exist in the DB), so leave them out here.
+    unverifiable = {k: v for k, v in SAMPLE.items() if k != "movement_links"}
+    body, report = bm.build(unverifiable, NOW, FakeChecks())
     assert body is None
     reasons = " ".join(report.rejected)
     assert "no page names this exhibition" in reasons
@@ -104,7 +114,8 @@ def test_published_reads_items_back(tmp_path):
     items = published.published(tmp_path)
     assert ("exhibition", "特別展「例示の美術」 @ 東京国立博物館") in items
     assert ("daily art", "星月夜 / フィンセント・ファン・ゴッホ") in items
-    assert len(items) == 4
+    assert ("artwork", "印象・日の出 / クロード・モネ") in items
+    assert len(items) == 8
 
 
 def test_venue_needs_geocodable_address():
@@ -113,3 +124,25 @@ def test_venue_needs_geocodable_address():
     no_coords = FakeChecks(pages={"https://www.tnm.jp/": "東京国立博物館"})
     assert bm.venue_statements([item], no_coords, report) == []
     assert "could not be geocoded" in report.rejected[0]
+
+
+def test_art_knowledge_rows_are_checked():
+    report = bm.Report()
+    movements = [
+        dict(SAMPLE["movements"][0], slug="Not A Slug"),
+        dict(SAMPLE["movements"][0], body="短すぎる本文"),
+        dict(SAMPLE["movements"][0], source_url="https://example.com/unrelated"),
+    ]
+    assert bm.movement_statements(movements, checks_for_sample(), report) == []
+    links = [{"from": "realism", "to": "realism", "kind": "led_to", "note": "x"},
+             {"from": "realism", "to": "impressionism", "kind": "friends", "note": "x"}]
+    assert bm.link_statements(links, report) == []
+    artworks = [dict(SAMPLE["artworks"][0], title_en="Unknown work", title="不明の作品")]
+    assert bm.artwork_statements(artworks, checks_for_sample(), report) == []
+    assert len(report.rejected) == 6 and not report.accepted
+
+
+def test_movement_body_keeps_paragraphs():
+    body, _ = bm.build({"movements": SAMPLE["movements"][:1]}, NOW, checks_for_sample())
+    assert "\\n\\n" not in body  # real line breaks inside the SQL string, not escapes
+    assert "描こうとした動きです。それまで" in body and "\n\nギュスターヴ" in body
