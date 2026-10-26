@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:encura/core/repositories/event_repository.dart';
 import 'package:encura/core/services/event_service.dart';
@@ -12,6 +14,7 @@ import 'package:encura/ui/screens/venue/venue_search_screen.dart';
 import 'package:encura/ui/screens/settings/settings_screen.dart';
 import 'package:encura/ui/screens/archive/archive_screen.dart';
 import 'package:encura/ui/widgets/daily_art_detail_dialog.dart';
+import '../../../core/utils/event_order.dart';
 import '../../../core/utils/image_url.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -27,6 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final TrendingRepository _trendingRepository = TrendingRepository();
   
   List<ArtEvent> _events = [];
+  /// Where the user is, once location is allowed; the list is then nearest first.
+  LatLng? _here;
   DailyColumn? _dailyColumn;
   List<TrendingArticle> _trendingArticles = [];
   bool _isLoading = true;
@@ -44,11 +49,48 @@ class _HomeScreenState extends State<HomeScreen> {
     
     if (mounted) {
       setState(() {
-        _events = events;
+        _events = _ordered(events);
         _dailyColumn = column;
         _trendingArticles = articles;
         _isLoading = false;
       });
+    }
+    // Show the list first; re-sort by distance once the location is known.
+    final here = await _currentLocation();
+    if (here != null && mounted) {
+      setState(() {
+        _here = here;
+        _events = _ordered(_events);
+      });
+    }
+  }
+
+  List<ArtEvent> _ordered(List<ArtEvent> events) {
+    final today = DateTime.now();
+    return _here == null ? orderForHome(events, today) : orderByDistance(events, _here!, today);
+  }
+
+  /// The current location, or null when it is off, not allowed or slow.
+  Future<LatLng?> _currentLocation() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return null;
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        return null;
+      }
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.low,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+      return LatLng(position.latitude, position.longitude);
+    } catch (e) {
+      debugPrint('Location unavailable: $e');
+      return null;
     }
   }
 
@@ -324,16 +366,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                                         placeholder: (context, url) => Container(color: Colors.grey[800]),
                                                         errorWidget: (context, url, error) {
                                                           debugPrint('Trending Topic Image load error: $error. URL: $url');
-                                                          return Container(
-                                                            color: Colors.grey[800],
-                                                            child: const Center(child: Icon(Icons.broken_image, color: Colors.white54)),
-                                                          );
+                                                          return _noImageCover(context);
                                                         },
                                                       )
-                                                    : Container(
-                                                        color: Colors.grey[800],
-                                                        child: const Center(child: Icon(Icons.image_not_supported, color: Colors.white54)),
-                                                      ),
+                                                    : _noImageCover(context),
                                                 Positioned(
                                                   top: 8,
                                                   right: 8,
@@ -407,6 +443,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final event = _events[index];
+                        // A running show is worth visiting before it closes;
+                        // an upcoming one, from its opening day.
+                        final running = isRunning(event, DateTime.now());
+                        final stubDate = running ? event.endDate : event.startDate;
+                        final km = distanceKm(event, _here);
                         return Container(
                           margin: const EdgeInsets.only(bottom: 16),
                           decoration: BoxDecoration(
@@ -443,7 +484,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
                                         Text(
-                                          "${event.startDate.month}",
+                                          "${stubDate.month}",
                                           style: TextStyle(
                                             color: Theme.of(context).primaryColor,
                                             fontWeight: FontWeight.bold,
@@ -451,7 +492,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           ),
                                         ),
                                         Text(
-                                          "${event.startDate.day}",
+                                          "${stubDate.day}",
                                           style: TextStyle(
                                             color: Theme.of(context).primaryColor,
                                             fontWeight: FontWeight.w900,
@@ -463,6 +504,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                           width: 40,
                                           height: 1,
                                           color: Theme.of(context).primaryColor.withValues(alpha: 0.5),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          running ? 'まで' : 'から',
+                                          style: TextStyle(
+                                            color: Theme.of(context).primaryColor,
+                                            fontSize: 11,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -487,7 +536,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                               const SizedBox(width: 4),
                                               Expanded(
                                                 child: Text(
-                                                  event.venue,
+                                                  km == null
+                                                      ? event.venue
+                                                      : '${event.venue}・${km < 10 ? km.toStringAsFixed(1) : km.round()} km',
                                                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                                     color: Colors.grey[400],
                                                   ),
@@ -527,6 +578,23 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
                 ),
+    );
+  }
+
+  /// News without a usable image: a quiet cover instead of a broken-image icon.
+  Widget _noImageCover(BuildContext context) {
+    final accent = Theme.of(context).primaryColor;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [accent.withValues(alpha: 0.25), Colors.grey[900]!],
+        ),
+      ),
+      child: Center(
+        child: Icon(Icons.article_outlined, size: 40, color: accent.withValues(alpha: 0.7)),
+      ),
     );
   }
 

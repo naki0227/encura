@@ -13,11 +13,9 @@ Environment:
                                    curator Edge Function); only lists models,
                                    which costs nothing
   SUPABASE_URL, SUPABASE_ANON_KEY  Supabase REST and the curator Edge Function
-  IMAGE_OPTIMIZER_URL              Rust image optimizer /process endpoint
 """
 from __future__ import annotations
 
-import base64
 import datetime as dt
 import os
 import sys
@@ -30,11 +28,6 @@ from common import gemini, images
 
 OK, WARN, FAIL, SKIP = "OK", "WARN", "FAIL", "SKIP"
 TIMEOUT = 60
-
-# 16x16 JPEG, enough for the optimizer to decode and re-encode.
-SAMPLE_JPEG = base64.b64decode(
-    "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAAQABADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwB1FFFfPnuH/9k="
-)
 
 
 @dataclass
@@ -184,31 +177,11 @@ def check_curator_function(http: requests.Session) -> Check:
     return Check(name, OK, f"answered ({len(text)} chars)")
 
 
-# --- Image optimizer --------------------------------------------------------
-
-@named('Image optimizer (Cloud Run)')
-def check_image_optimizer(http: requests.Session) -> Check:
-    name = check_image_optimizer.label
-    url = env("IMAGE_OPTIMIZER_URL")
-    if not url:
-        return Check(name, SKIP, "IMAGE_OPTIMIZER_URL not set")
-    try:
-        res = http.post(url, files={"image": ("sample.jpg", SAMPLE_JPEG, "image/jpeg")}, timeout=TIMEOUT)
-    except requests.RequestException as e:
-        return Check(name, WARN, f"unreachable: {e} (the app falls back to the original image)")
-    content_type = res.headers.get("content-type", "")
-    if res.status_code != 200 or not content_type.startswith("image/"):
-        return Check(name, WARN,
-                     f"HTTP {res.status_code} {content_type} (the app falls back to the original image)")
-    return Check(name, OK, f"{content_type}, {len(res.content)} bytes")
-
-
 CHECKS: list[Callable[[requests.Session], Check]] = [
     check_gemini_models,
     check_supabase_content,
     check_content_images,
     check_curator_function,
-    check_image_optimizer,
 ]
 
 

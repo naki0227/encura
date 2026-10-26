@@ -25,13 +25,12 @@ jobs:
 
       - run: pip install -r scripts/requirements.txt
 
-      - name: Check Gemini, Supabase, Edge Function and image optimizer
+      - name: Check Gemini, Supabase and the Edge Function
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          IMAGE_OPTIMIZER_URL: ${{ vars.IMAGE_OPTIMIZER_URL }}
         run: python scripts/health_check.py
 
       # GitHub disables scheduled workflows after 60 days without repository

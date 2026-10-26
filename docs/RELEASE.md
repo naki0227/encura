@@ -28,19 +28,11 @@
 3. 必要ならモデルを変える: `GEMINI_MODEL`（カンマ区切りで先頭から試す。既定 `gemini-3.8-flash,gemini-3.6-flash`）。
 4. 関数のデプロイは CI が行います（手順 4 の `SUPABASE_ACCESS_TOKEN` と `SUPABASE_PROJECT_REF` を登録すると、`main` に変更が入るたびに自動でデプロイ）。初回だけ **Actions → DB Migrations → Run workflow** を実行してください。
 
-## 3. 画像最適化サービス（Cloud Run）を再デプロイする
+## 3. 使わなくなった Cloud Run のサービスを消す
 
-いまの URL は Cloud Run のプレースホルダーを返しています。アプリは画像以外の応答を無視して元画像で続行するので、この手順をしなくても Scan & Guide は動きます。
+写真の縮小・圧縮は、1.0.5 からアプリの中で行います。画像最適化サービス（Google Cloud Run の `encura`、europe-west1）は使わなくなりました。
 
-```bash
-gcloud run deploy encura \
-  --source image_optimizer \
-  --region europe-west1 \
-  --allow-unauthenticated
-```
-
-確認: `curl -F image=@sample.jpg https://<service-url>/process -o out.jpg` で `image/jpeg` が返ること。
-URL が変わった場合は、手順 4 の Variable `IMAGE_OPTIMIZER_URL` に新しい URL を入れます。
+アクセスがなければ料金はほぼかかりません。それでも、Google Cloud のコンソールで **Cloud Run → `encura` → 削除** をしておくと、料金がかかる余地がなくなります。サービスが 1 つだけのプロジェクトなら、課金の設定から外しても構いません。
 
 ## 4. GitHub の Secrets と Variables を設定する
 
@@ -59,7 +51,6 @@ DB への反映・ビルド・TestFlight・点検は、すべて GitHub Actions 
 | Secret | `ASC_ISSUER_ID` | 同じく Issuer ID | iOS リリース |
 | Secret | `ASC_KEY_P8_BASE64` | `.p8` ファイルを base64 にしたもの（`base64 -i AuthKey_XXXX.p8 \| pbcopy`） | iOS リリース |
 | Variable | `GEMINI_MODEL` | 任意。Edge Function と同じ値にする | 点検 |
-| Variable | `IMAGE_OPTIMIZER_URL` | 任意。最適化サービスの `/process`。未設定ならアプリの既定値 | iOS リリース・点検 |
 
 登録したら **Actions → DB Migrations → Run workflow** を実行します。新しい DB にテーブルが作られ、Edge Function がデプロイされます。以後、`supabase/migrations/` に入ったマイグレーションは、`main` に入ったときに自動で本番に当たります（どこまで当てたかは DB の `supabase_migrations.schema_migrations` に日時つきで記録されます）。
 
@@ -78,7 +69,6 @@ App Store Connect API キーの作り方:
 | Supabase: database and content | プロジェクトが止まった／今日の一枚・展覧会・ニュースが古い（毎日のコンテンツ更新が止まっている） |
 | Supabase: content images | 表示中の画像が読み込めない |
 | Edge Function: curator | アプリと同じ経路（匿名サインイン → 関数）で AI 学芸員が答えるか（1 日 1 回、短い質問を 1 つ送る） |
-| Image optimizer | 最適化サービスが画像を返すか（止まっていても警告だけ。アプリは元画像で動く） |
 
 - どれかが失敗すると workflow が赤になり、「Health check failed」という Issue を作ります（開いたままなら日付つきでコメントを足します）。
 - 点検のスケジュールが「60 日無更新での自動停止」にかからないよう、毎回有効にし直します。
@@ -99,7 +89,7 @@ DB の鍵は Claude に渡しません。Routine の作成は、手順 1〜4 が
 
 1. 手順 1〜4 が済んでいることを確認する。
 2. **Actions → iOS Release (TestFlight) → Run workflow** を実行する。
-   - `build_number` は空なら `pubspec.yaml` の値（今回は 7）。同じ番号は二度上げられないので、作り直すときは 8, 9… を入れる。
+   - `build_number` は空なら `pubspec.yaml` の値（今回は 8。7 は 2026-10-26 にアップロード済み）。同じ番号は二度上げられないので、作り直すときは 8, 9… を入れる。
    - `v1.0.5` のようなタグを push しても動きます。
    - 初回は GitHub の Environment「release」が自動で作られます。承認者を付けたい場合は **Settings → Environments → release** で設定します。
 3. 15〜30 分ほどで、App Store Connect の TestFlight にビルドが出ます。輸出コンプライアンスは Info.plist で「該当なし（HTTPS のみ）」と申告済みなので、そのままテスターに配れます。
