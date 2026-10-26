@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/models/art_knowledge.dart';
+import '../../../core/services/favorites_store.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/motion.dart';
 import 'learn_widgets.dart';
@@ -43,7 +44,10 @@ class ArtworkScreen extends StatelessWidget {
     final meta = [artwork.artist, if (artwork.year != null) artwork.yearLabel].join('・');
 
     return Scaffold(
-      appBar: AppBar(title: Text(movement?.nameJa ?? '作品')),
+      appBar: AppBar(
+        title: Text(movement?.nameJa ?? '作品'),
+        actions: [FavoriteButton(artworkId: artwork.id)],
+      ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 48),
         children: [
@@ -120,6 +124,41 @@ class ArtworkScreen extends StatelessWidget {
             ArtworkRow(label: 'Same movement', title: '${movement.nameJa}の作品', works: sameMovement, knowledge: knowledge),
         ],
       ),
+    );
+  }
+}
+
+/// ♡ for an artwork. Saved on the device only.
+class FavoriteButton extends StatelessWidget {
+  const FavoriteButton({super.key, required this.artworkId});
+
+  final String artworkId;
+
+  @override
+  Widget build(BuildContext context) {
+    final store = FavoritesStore.instance;
+    return ListenableBuilder(
+      listenable: store,
+      builder: (context, _) {
+        final on = store.contains(artworkId);
+        return IconButton(
+          tooltip: on ? 'お気に入りから外す' : 'お気に入りに入れる',
+          onPressed: () => store.toggle(artworkId),
+          icon: AnimatedSwitcher(
+            duration: Motion.reduced(context) ? Duration.zero : Motion.mid,
+            switchInCurve: Motion.curve,
+            transitionBuilder: (child, animation) => ScaleTransition(
+              scale: Tween(begin: 0.6, end: 1.0).animate(animation),
+              child: FadeTransition(opacity: animation, child: child),
+            ),
+            child: Icon(
+              on ? Icons.favorite : Icons.favorite_border,
+              key: ValueKey(on),
+              color: on ? Palette.gold : Palette.text,
+            ),
+          ),
+        );
+      },
     );
   }
 }

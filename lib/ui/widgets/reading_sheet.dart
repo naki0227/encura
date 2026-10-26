@@ -103,6 +103,7 @@ class _ReadingView extends StatelessWidget {
                   width: double.infinity,
                   child: CachedNetworkImage(
                     imageUrl: normalizeImageUrl(imageUrl),
+                    httpHeaders: imageHeaders,
                     fit: BoxFit.contain,
                     fadeInCurve: Motion.curve,
                     placeholder: (context, url) => const SizedBox(height: 280),

@@ -193,6 +193,7 @@ class _ArchiveScreenState extends State<ArchiveScreen> with SingleTickerProvider
                       borderRadius: BorderRadius.circular(4),
                       child: CachedNetworkImage(
                         imageUrl: _sanitizeUrl(column.imageUrl),
+                        httpHeaders: imageHeaders,
                         width: 50,
                         height: 50,
                         fit: BoxFit.cover,
@@ -237,6 +238,7 @@ class _ArchiveScreenState extends State<ArchiveScreen> with SingleTickerProvider
                       borderRadius: BorderRadius.circular(4),
                       child: CachedNetworkImage(
                         imageUrl: _sanitizeUrl(article.imageUrl),
+                        httpHeaders: imageHeaders,
                         width: 50,
                         height: 50,
                         fit: BoxFit.cover,

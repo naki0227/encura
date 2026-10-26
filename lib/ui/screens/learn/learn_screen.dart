@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../core/models/art_knowledge.dart';
 import '../../../core/repositories/knowledge_repository.dart';
+import '../../../core/services/favorites_store.dart';
+import '../../../core/utils/recommend.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/motion.dart';
+import 'artwork_screen.dart';
 import 'learn_widgets.dart';
 import 'library_screen.dart';
 import 'movement_screen.dart';
@@ -26,6 +29,7 @@ class _LearnScreenState extends State<LearnScreen> {
   @override
   void initState() {
     super.initState();
+    FavoritesStore.instance.load();
     _load();
   }
 
@@ -84,6 +88,12 @@ class _LearnScreenState extends State<LearnScreen> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
             child: _LibraryEntry(knowledge: k),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: ListenableBuilder(
+            listenable: FavoritesStore.instance,
+            builder: (context, _) => _ForYou(knowledge: k),
           ),
         ),
         const SliverToBoxAdapter(
@@ -312,6 +322,127 @@ class _TimelineItem extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Suggestions from the works marked with ♡ (worked out on the device), or a
+/// hint on how to get them.
+class _ForYou extends StatelessWidget {
+  const _ForYou({required this.knowledge});
+
+  final ArtKnowledge knowledge;
+
+  @override
+  Widget build(BuildContext context) {
+    final favorites = FavoritesStore.instance.ids;
+    if (favorites.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: Palette.line),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.favorite_border, color: Palette.gold, size: 20),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '気になる作品に♡を付けると、好みに合いそうな作品をここでおすすめします。♡はこの端末の中だけに保存されます。',
+                  style: TextStyle(color: Palette.textSub, fontSize: 12, height: 1.8),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    final recs = recommend(knowledge, favorites);
+    return Padding(
+      padding: const EdgeInsets.only(top: 36),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: SectionHeading(
+              label: 'For you',
+              title: 'あなたへのおすすめ',
+              trailing: TextButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => LibraryScreen(knowledge: knowledge, favoritesOnly: true)),
+                ),
+                icon: const Icon(Icons.favorite, size: 14, color: Palette.gold),
+                label: Text('${favorites.length}', style: const TextStyle(color: Palette.text)),
+              ),
+            ),
+          ),
+          if (recs.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 262,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: recs.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, i) => _RecommendationCard(recommendation: recs[i], knowledge: knowledge),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RecommendationCard extends StatelessWidget {
+  const _RecommendationCard({required this.recommendation, required this.knowledge});
+
+  final Recommendation recommendation;
+  final ArtKnowledge knowledge;
+
+  @override
+  Widget build(BuildContext context) {
+    final a = recommendation.artwork;
+    return Pressable(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ArtworkScreen(artwork: a, knowledge: knowledge)),
+      ),
+      child: SizedBox(
+        width: 150,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Palette.line),
+                ),
+                child: KnowledgeImage(a.imageUrl),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(a.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Palette.text, fontSize: 13, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text(recommendation.reason,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Palette.gold, fontSize: 11, height: 1.5)),
+          ],
+        ),
       ),
     );
   }
