@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:encura/core/repositories/event_repository.dart';
 import 'package:encura/core/services/event_service.dart';
@@ -28,6 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final TrendingRepository _trendingRepository = TrendingRepository();
   
   List<ArtEvent> _events = [];
+  /// Where the user is, once location is allowed; the list is then nearest first.
+  LatLng? _here;
   DailyColumn? _dailyColumn;
   List<TrendingArticle> _trendingArticles = [];
   bool _isLoading = true;
@@ -45,11 +49,48 @@ class _HomeScreenState extends State<HomeScreen> {
     
     if (mounted) {
       setState(() {
-        _events = orderForHome(events, DateTime.now());
+        _events = _ordered(events);
         _dailyColumn = column;
         _trendingArticles = articles;
         _isLoading = false;
       });
+    }
+    // Show the list first; re-sort by distance once the location is known.
+    final here = await _currentLocation();
+    if (here != null && mounted) {
+      setState(() {
+        _here = here;
+        _events = _ordered(_events);
+      });
+    }
+  }
+
+  List<ArtEvent> _ordered(List<ArtEvent> events) {
+    final today = DateTime.now();
+    return _here == null ? orderForHome(events, today) : orderByDistance(events, _here!, today);
+  }
+
+  /// The current location, or null when it is off, not allowed or slow.
+  Future<LatLng?> _currentLocation() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return null;
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        return null;
+      }
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.low,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+      return LatLng(position.latitude, position.longitude);
+    } catch (e) {
+      debugPrint('Location unavailable: $e');
+      return null;
     }
   }
 
@@ -406,6 +447,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         // an upcoming one, from its opening day.
                         final running = isRunning(event, DateTime.now());
                         final stubDate = running ? event.endDate : event.startDate;
+                        final km = distanceKm(event, _here);
                         return Container(
                           margin: const EdgeInsets.only(bottom: 16),
                           decoration: BoxDecoration(
@@ -494,7 +536,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                               const SizedBox(width: 4),
                                               Expanded(
                                                 child: Text(
-                                                  event.venue,
+                                                  km == null
+                                                      ? event.venue
+                                                      : '${event.venue}・${km < 10 ? km.toStringAsFixed(1) : km.round()} km',
                                                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                                     color: Colors.grey[400],
                                                   ),
