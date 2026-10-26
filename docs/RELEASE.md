@@ -99,7 +99,7 @@ DB の鍵は Claude に渡しません。Routine の作成は、手順 1〜4 が
 
 1. 手順 1〜4 が済んでいることを確認する。
 2. **Actions → iOS Release (TestFlight) → Run workflow** を実行する。
-   - `build_number` は空なら `pubspec.yaml` の値（今回は 7）。同じ番号は二度上げられないので、作り直すときは 8, 9… を入れる。
+   - `build_number` は空なら `pubspec.yaml` の値（今回は 8。7 は 2026-10-26 にアップロード済み）。同じ番号は二度上げられないので、作り直すときは 8, 9… を入れる。
    - `v1.0.5` のようなタグを push しても動きます。
    - 初回は GitHub の Environment「release」が自動で作られます。承認者を付けたい場合は **Settings → Environments → release** で設定します。
 3. 15〜30 分ほどで、App Store Connect の TestFlight にビルドが出ます。輸出コンプライアンスは Info.plist で「該当なし（HTTPS のみ）」と申告済みなので、そのままテスターに配れます。

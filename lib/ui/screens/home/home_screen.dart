@@ -12,6 +12,7 @@ import 'package:encura/ui/screens/venue/venue_search_screen.dart';
 import 'package:encura/ui/screens/settings/settings_screen.dart';
 import 'package:encura/ui/screens/archive/archive_screen.dart';
 import 'package:encura/ui/widgets/daily_art_detail_dialog.dart';
+import '../../../core/utils/event_order.dart';
 import '../../../core/utils/image_url.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -44,7 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
     
     if (mounted) {
       setState(() {
-        _events = events;
+        _events = orderForHome(events, DateTime.now());
         _dailyColumn = column;
         _trendingArticles = articles;
         _isLoading = false;
@@ -324,16 +325,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                                         placeholder: (context, url) => Container(color: Colors.grey[800]),
                                                         errorWidget: (context, url, error) {
                                                           debugPrint('Trending Topic Image load error: $error. URL: $url');
-                                                          return Container(
-                                                            color: Colors.grey[800],
-                                                            child: const Center(child: Icon(Icons.broken_image, color: Colors.white54)),
-                                                          );
+                                                          return _noImageCover(context);
                                                         },
                                                       )
-                                                    : Container(
-                                                        color: Colors.grey[800],
-                                                        child: const Center(child: Icon(Icons.image_not_supported, color: Colors.white54)),
-                                                      ),
+                                                    : _noImageCover(context),
                                                 Positioned(
                                                   top: 8,
                                                   right: 8,
@@ -407,6 +402,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final event = _events[index];
+                        // A running show is worth visiting before it closes;
+                        // an upcoming one, from its opening day.
+                        final running = isRunning(event, DateTime.now());
+                        final stubDate = running ? event.endDate : event.startDate;
                         return Container(
                           margin: const EdgeInsets.only(bottom: 16),
                           decoration: BoxDecoration(
@@ -443,7 +442,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
                                         Text(
-                                          "${event.startDate.month}",
+                                          "${stubDate.month}",
                                           style: TextStyle(
                                             color: Theme.of(context).primaryColor,
                                             fontWeight: FontWeight.bold,
@@ -451,7 +450,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           ),
                                         ),
                                         Text(
-                                          "${event.startDate.day}",
+                                          "${stubDate.day}",
                                           style: TextStyle(
                                             color: Theme.of(context).primaryColor,
                                             fontWeight: FontWeight.w900,
@@ -463,6 +462,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                           width: 40,
                                           height: 1,
                                           color: Theme.of(context).primaryColor.withValues(alpha: 0.5),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          running ? 'まで' : 'から',
+                                          style: TextStyle(
+                                            color: Theme.of(context).primaryColor,
+                                            fontSize: 11,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -527,6 +534,23 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
                 ),
+    );
+  }
+
+  /// News without a usable image: a quiet cover instead of a broken-image icon.
+  Widget _noImageCover(BuildContext context) {
+    final accent = Theme.of(context).primaryColor;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [accent.withValues(alpha: 0.25), Colors.grey[900]!],
+        ),
+      ),
+      child: Center(
+        child: Icon(Icons.article_outlined, size: 40, color: accent.withValues(alpha: 0.7)),
+      ),
     );
   }
 
