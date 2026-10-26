@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'core/services/supabase_service.dart';
 import 'ui/screens/home/home_screen.dart';
 import 'ui/screens/chat/chat_screen.dart';
+import 'ui/screens/learn/learn_screen.dart';
 import 'ui/theme/tokens.dart';
 
 Future<void> main() async {
@@ -98,6 +99,7 @@ class _MainScreenState extends State<MainScreen> {
   
   static const List<Widget> _screens = [
     HomeScreen(),
+    LearnScreen(),
     ChatScreen(),
     // EventMapScreen(), // Temporarily disabled or moved
   ];
@@ -192,6 +194,11 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
             label: 'ホーム',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.auto_stories_outlined),
+            selectedIcon: Icon(Icons.auto_stories),
+            label: '学ぶ',
           ),
           NavigationDestination(
             icon: Icon(Icons.chat_bubble_outline),
