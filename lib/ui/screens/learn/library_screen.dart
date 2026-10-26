@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/models/art_knowledge.dart';
+import '../../../core/services/favorites_store.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/motion.dart';
 import 'learn_widgets.dart';
 
 /// Every public-domain work in the app, by movement or by search.
 class LibraryScreen extends StatefulWidget {
-  const LibraryScreen({super.key, required this.knowledge, this.initialMovement});
+  const LibraryScreen({super.key, required this.knowledge, this.initialMovement, this.favoritesOnly = false});
 
   final ArtKnowledge knowledge;
   final String? initialMovement;
+  final bool favoritesOnly;
 
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
@@ -18,12 +20,30 @@ class LibraryScreen extends StatefulWidget {
 
 class _LibraryScreenState extends State<LibraryScreen> {
   late String? _movement = widget.initialMovement;
+  late bool _favorites = widget.favoritesOnly;
   String _query = '';
   final Set<Object> _revealed = {};
 
+  @override
+  void initState() {
+    super.initState();
+    // Coming back from an artwork after changing its ♡ updates the list.
+    FavoritesStore.instance.addListener(_changed);
+  }
+
+  @override
+  void dispose() {
+    FavoritesStore.instance.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() => setState(() {});
+
   List<Artwork> get _works {
     final q = _query.trim().toLowerCase();
+    final favorites = FavoritesStore.instance;
     return widget.knowledge.artworks.where((a) {
+      if (_favorites && !favorites.contains(a.id)) return false;
       if (_movement != null && a.movementSlug != _movement) return false;
       if (q.isEmpty) return true;
       return a.title.toLowerCase().contains(q) || a.artist.toLowerCase().contains(q);
@@ -64,9 +84,31 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 children: [
-                  _Chip(label: 'すべて', selected: _movement == null, onTap: () => setState(() => _movement = null)),
+                  _Chip(
+                    label: 'すべて',
+                    selected: _movement == null && !_favorites,
+                    onTap: () => setState(() {
+                      _movement = null;
+                      _favorites = false;
+                    }),
+                  ),
+                  _Chip(
+                    label: '♡ お気に入り',
+                    selected: _favorites,
+                    onTap: () => setState(() {
+                      _favorites = !_favorites;
+                      _movement = null;
+                    }),
+                  ),
                   for (final m in withWorks)
-                    _Chip(label: m.nameJa, selected: _movement == m.slug, onTap: () => setState(() => _movement = m.slug)),
+                    _Chip(
+                      label: m.nameJa,
+                      selected: _movement == m.slug,
+                      onTap: () => setState(() {
+                        _movement = m.slug;
+                        _favorites = false;
+                      }),
+                    ),
                 ],
               ),
             ),

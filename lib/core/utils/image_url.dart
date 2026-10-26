@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 /// Wikimedia only serves thumbnails in these widths; any other width is
 /// refused with an HTML error page (https://w.wiki/GHai). Older crawler runs
 /// stored 640px / 800px URLs, which stopped loading.
@@ -27,3 +29,10 @@ String normalizeImageUrl(String url) {
   // Drop any query string: it is not part of the thumbnail path.
   return '${match.group(1)}${allowed}px-${match.group(3)}';
 }
+
+/// Request headers for artwork images. Wikimedia asks apps to identify
+/// themselves with a contact address and throttles anonymous clients harder.
+/// Browsers do not allow setting the User-Agent, so the web build sends none.
+final Map<String, String>? imageHeaders = kIsWeb
+    ? null
+    : const {'User-Agent': 'EnCura/1.0.5 (+https://enludus.com; contact@enludus.com)'};

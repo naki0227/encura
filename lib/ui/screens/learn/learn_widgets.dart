@@ -10,22 +10,53 @@ import '../chat/chat_screen.dart';
 import 'artwork_screen.dart';
 
 /// A picture from the library, quiet while it loads.
-class KnowledgeImage extends StatelessWidget {
+///
+/// Wikimedia throttles bursts (HTTP 429) when many thumbnails load at once,
+/// so a failed image is tried again after a pause, twice at most.
+class KnowledgeImage extends StatefulWidget {
   const KnowledgeImage(this.url, {super.key, this.fit = BoxFit.cover});
 
   final String url;
   final BoxFit fit;
 
   @override
+  State<KnowledgeImage> createState() => _KnowledgeImageState();
+}
+
+class _KnowledgeImageState extends State<KnowledgeImage> {
+  static const _maxRetries = 2;
+  int _attempt = 0;
+  bool _retryScheduled = false;
+
+  void _scheduleRetry(String url) {
+    if (_retryScheduled || _attempt >= _maxRetries) return;
+    _retryScheduled = true;
+    Future.delayed(Duration(seconds: 3 * (_attempt + 1)), () async {
+      await CachedNetworkImage.evictFromCache(url);
+      if (!mounted) return;
+      setState(() {
+        _attempt++;
+        _retryScheduled = false;
+      });
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (url.isEmpty) return Container(color: Palette.frame);
+    if (widget.url.isEmpty) return Container(color: Palette.frame);
+    final url = normalizeImageUrl(widget.url);
     return CachedNetworkImage(
-      imageUrl: normalizeImageUrl(url),
-      fit: fit,
+      key: ValueKey(_attempt),
+      imageUrl: url,
+      httpHeaders: imageHeaders,
+      fit: widget.fit,
       fadeInCurve: Motion.curve,
       fadeInDuration: Motion.reduced(context) ? Duration.zero : Motion.mid,
       placeholder: (context, _) => Container(color: Palette.frame),
-      errorWidget: (context, _, __) => Container(color: Palette.frame),
+      errorWidget: (context, _, __) {
+        _scheduleRetry(url);
+        return Container(color: Palette.frame);
+      },
     );
   }
 }

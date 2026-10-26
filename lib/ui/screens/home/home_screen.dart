@@ -201,6 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
               builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
               child: CachedNetworkImage(
                 imageUrl: _sanitizeUrl(column.imageUrl),
+                httpHeaders: imageHeaders,
                 fit: BoxFit.cover,
                 fadeInDuration: reduced ? Duration.zero : Motion.slow,
                 fadeInCurve: Motion.curve,
@@ -315,6 +316,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     article.imageUrl.isNotEmpty
                                         ? CachedNetworkImage(
                                             imageUrl: _sanitizeUrl(article.imageUrl),
+                                            httpHeaders: imageHeaders,
                                             fit: BoxFit.cover,
                                             fadeInCurve: Motion.curve,
                                             placeholder: (context, url) => Container(color: Palette.frame),
