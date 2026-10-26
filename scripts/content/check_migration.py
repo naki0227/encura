@@ -18,7 +18,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from content.build_migration import GENERATED_MARK  # noqa: E402
 
 NAME = re.compile(r"^supabase/migrations/\d{14}_content_\d{8}\.sql$")
-TABLES = ("public.venues", "public.events", "public.daily_columns", "public.trending_articles")
+TABLES = (
+    "public.venues", "public.events", "public.daily_columns", "public.trending_articles",
+    "public.art_movements", "public.movement_links", "public.artworks",
+)
 FORBIDDEN = re.compile(
     r"\b(drop|alter|delete|truncate|grant|revoke|create|copy|execute|call|do|function|"
     r"policy|role|security|set\s+role|pg_\w+|auth\.|storage\.|vacuum|comment)\b",
