@@ -148,7 +148,11 @@ class _LibraryEntry extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final covers = knowledge.artworks.take(3).toList();
+    // Two works from far apart in time, like two walls of a gallery.
+    final covers = [
+      if (knowledge.artworks.isNotEmpty) knowledge.artworks.first,
+      if (knowledge.artworks.length > 1) knowledge.artworks[knowledge.artworks.length ~/ 2],
+    ];
     return Pressable(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LibraryScreen(knowledge: knowledge))),
       child: Container(
@@ -161,7 +165,6 @@ class _LibraryEntry extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Three works side by side, like a wall of a gallery.
             for (final a in covers)
               Expanded(child: SizedBox.expand(child: KnowledgeImage(a.imageUrl))),
             Expanded(

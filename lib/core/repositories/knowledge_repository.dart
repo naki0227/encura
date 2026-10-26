@@ -8,12 +8,12 @@ class KnowledgeRepository {
   Future<ArtKnowledge> load() async {
     try {
       final results = await Future.wait([
-        _client.from('art_movements').select().order('start_year'),
+        _client.from('art_movements').select().order('start_year', ascending: true),
         _client.from('movement_links').select('from_slug, to_slug, kind, note'),
         _client
             .from('artworks')
             .select('id, title, artist, year, movement_slug, collection, image_url, content')
-            .order('year'),
+            .order('year', ascending: true),
       ]);
       return ArtKnowledge(
         movements: (results[0] as List).map((e) => Movement.fromJson(e)).toList(),
