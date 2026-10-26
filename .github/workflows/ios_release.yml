@@ -62,7 +62,7 @@ jobs:
           ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
         run: |
           python3 - <<'PY'
-          import json, os
+          import base64, binascii, json, os, sys
           config = {k: os.environ[k] for k in ("SUPABASE_URL", "SUPABASE_ANON_KEY")}
           # Unset variable -> keep the app's built-in default URL.
           if os.environ.get("IMAGE_OPTIMIZER_URL"):
@@ -70,8 +70,22 @@ jobs:
           path = os.path.join(os.environ["RUNNER_TEMP"], "prod.json")
           with open(path, "w") as f:
               json.dump(config, f)
+
+          # The secret may hold the .p8 file base64-encoded (with or without
+          # line breaks) or the file's text itself; accept both.
+          key = os.environ["ASC_KEY_P8_BASE64"].strip()
+          if "BEGIN PRIVATE KEY" not in key:
+              try:
+                  key = base64.b64decode("".join(key.split()), validate=True).decode().strip()
+              except (binascii.Error, UnicodeDecodeError):
+                  key = ""
+          if not (key.startswith("-----BEGIN PRIVATE KEY-----") and key.endswith("-----END PRIVATE KEY-----")):
+              print("::error::ASC_KEY_P8_BASE64 is not an App Store Connect key: "
+                    "use the base64 of AuthKey_XXXX.p8 (or the file's text)")
+              sys.exit(1)
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "AuthKey.p8"), "w") as f:
+              f.write(key + "\n")
           PY
-          echo "$ASC_KEY_P8_BASE64" | base64 --decode > "$RUNNER_TEMP/AuthKey.p8"
 
       - name: Archive and upload to TestFlight
         env:
