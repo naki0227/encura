@@ -1,5 +1,4 @@
 {
   "SUPABASE_URL": "https://<project-ref>.supabase.co",
-  "SUPABASE_ANON_KEY": "<supabase anon (public) key>",
-  "IMAGE_OPTIMIZER_URL": "https://<cloud-run-service>.run.app/process"
+  "SUPABASE_ANON_KEY": "<supabase anon (public) key>"
 }

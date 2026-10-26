@@ -59,7 +59,6 @@ We adopt a modern and scalable configuration.
 | :--- | :--- | :--- |
 | **Frontend** | **Flutter** (Dart) | Cross-platform development (iOS/Android) |
 | **Backend** | **Supabase** | BaaS (Auth, Database, Edge Functions, Storage) |
-| **Backend (Microservice)** | **Rust (Actix-web)** | Cloud Run service handling high-load image processing (resize/compress/privacy) |
 | **Database** | **PostgreSQL** | `PostGIS` (Location), `pgvector` (AI Search) |
 | **AI Model** | **Google Gemini 2.5** | Flash (Real-time response), Pro (Batch processing) |
 | **DevOps** | **GitHub Actions** | DB migrations, health check, TestFlight, CI |
@@ -80,10 +79,6 @@ graph TD
         Curator["Edge Function: curator"]
     end
     
-    subgraph "High Performance Service (Cloud Run)"
-        Rust["🦀 Rust Image Optimizer"]
-    end
-    
     subgraph "AI Services (Google)"
         Gemini["✨ Gemini 2.5 Flash/Pro"]
     end
@@ -96,8 +91,6 @@ graph TD
     %% Flows
     User -->|Chat / Scan| Curator
     Curator -->|API key on server| Gemini
-    User -->|Raw Image| Rust
-    Rust -->|Optimized Image| User
     User -->|Read / Write| DB
     User -->|Upload Maps| Storage
     
@@ -105,9 +98,8 @@ graph TD
     Actions -->|Apply migrations| DB
 ```
 
-### 🦀 Rust Microservice Strategy
-High-CPU tasks like image processing (resizing high-quality photos, compression, face mosaic processing) are offloaded to a dedicated microservice built with **Rust (Actix-web)**, rather than handling them within the Flutter app or a general-purpose server.
-This achieves both **"blazing fast response times"** and **"memory safety"**, while minimizing battery consumption and heat generation on the mobile device.
+### 📷 Photos
+Photos for Scan & Guide are resized (1024 px) and compressed on the device when they are taken, then sent to the curator function. No separate image server is needed.
 
 ---
 
@@ -133,7 +125,6 @@ cp config/prod.example.json config/prod.json   # fill in values (config/*.json i
 | :--- | :--- |
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_ANON_KEY` | Supabase anon (public) key |
-| `IMAGE_OPTIMIZER_URL` | Rust image optimizer `/process` endpoint (empty disables it) |
 
 Edge Function:
 

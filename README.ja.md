@@ -59,7 +59,6 @@
 | :--- | :--- | :--- |
 | **Frontend** | **Flutter** (Dart) | クロスプラットフォーム開発 (iOS/Android) |
 | **Backend** | **Supabase** | BaaS (Auth, Database, Edge Functions, Storage) |
-| **Backend (Microservice)** | **Rust (Actix-web)** | 高負荷な画像処理（リサイズ・圧縮・プライバシー加工）を担当するCloud Runサービス |
 | **Database** | **PostgreSQL** | `PostGIS` (位置情報), `pgvector` (AI検索用) |
 | **AI Model** | **Google Gemini 2.5** | Flash (リアルタイム応答), Pro (バッチ処理) |
 | **DevOps** | **GitHub Actions** | DB マイグレーション、点検、TestFlight、CI |
@@ -79,7 +78,6 @@ encura/
 │   ├── core/                # 設定・サービス・リポジトリ・モデル
 │   └── ui/                  # 画面とウィジェット
 ├── test/                    # Flutter のテスト
-├── image_optimizer/         # 画像処理マイクロサービス (Rust/Actix-web, Cloud Run)
 ├── scripts/
 │   ├── content/             # 毎日のコンテンツを確かめてマイグレーションにする
 │   ├── health_check.py      # 外部依存の点検
@@ -101,10 +99,6 @@ graph TD
         Curator["Edge Function: curator"]
     end
     
-    subgraph "High Performance Service (Cloud Run)"
-        Rust["🦀 Rust Image Optimizer"]
-    end
-    
     subgraph "AI Services (Google)"
         Gemini["✨ Gemini 2.5 Flash/Pro"]
     end
@@ -117,8 +111,6 @@ graph TD
     %% Flows
     User -->|Chat / Scan| Curator
     Curator -->|API key on server| Gemini
-    User -->|Raw Image| Rust
-    Rust -->|Optimized Image| User
     User -->|Read / Write| DB
     User -->|Upload Maps| Storage
     
@@ -126,9 +118,8 @@ graph TD
     Actions -->|Apply migrations| DB
 ```
 
-### 🦀 Rust Microservice Strategy
-CPU負荷の高い画像処理（高画質写真のリサイズ・圧縮・顔認識モザイク処理）については、Flutterアプリ内や汎用サーバーではなく、**Rust (Actix-web)** による専用マイクロサービスとして切り出しています。
-これにより、**「爆速なレスポンス」** と **「メモリ安全性の担保」** を両立し、モバイルアプリのバッテリー消費や発熱も抑えています。
+### 📷 写真の扱い
+Scan & Guide の写真は、撮った時点で端末の中で縮小（1024px）・圧縮してから、AI 学芸員の関数に送ります。画像処理用のサーバーは使いません。
 
 ### 🗄 データベース設計 (Database Schema)
 Supabase (PostgreSQL) 上で、地理空間データ(PostGIS)とベクトルデータ(pgvector)を統合管理しています。
@@ -159,7 +150,6 @@ erDiagram
 | Layer | Technology | Scope |
 |:---|:---|:---|
 | **Unit Test** | `flutter_test` | ViewModel, Repository層のロジック検証 |
-| **Microservice** | `cargo test` | Rustによる画像処理ロジックの単体テスト |
 | **E2E** | Manual / Maestro | 実機でのUI動作確認 |
 | **CI** | GitHub Actions | PR作成時の自動ビルド・Lintチェック |
 
@@ -188,7 +178,6 @@ cp config/prod.example.json config/prod.json   # 値を埋める（config/*.json
 | :--- | :--- |
 | `SUPABASE_URL` | Supabase プロジェクトの URL |
 | `SUPABASE_ANON_KEY` | Supabase の anon（公開）キー |
-| `IMAGE_OPTIMIZER_URL` | Rust 画像最適化サービスの `/process`（空にすると最適化を使わない） |
 
 Edge Function 側:
 

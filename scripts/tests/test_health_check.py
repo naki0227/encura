@@ -27,12 +27,6 @@ def test_revoked_key_fails(monkeypatch):
     assert result.status == hc.FAIL and "400" in result.detail
 
 
-def test_optimizer_html_placeholder_is_flagged(monkeypatch):
-    monkeypatch.setenv("IMAGE_OPTIMIZER_URL", "https://opt.example/process")
-    http = FakeSession([("opt.example", FakeResponse(200, "<title>Placeholder</title>"))])
-    assert hc.check_image_optimizer(http).status == hc.WARN
-
-
 def test_paused_supabase_fails(monkeypatch):
     monkeypatch.setenv("SUPABASE_URL", "https://p.supabase.co")
     monkeypatch.setenv("SUPABASE_ANON_KEY", "anon")
@@ -41,7 +35,7 @@ def test_paused_supabase_fails(monkeypatch):
 
 
 def test_missing_settings_are_skipped_and_crashes_are_failures(monkeypatch):
-    for name in ("GEMINI_API_KEY", "SUPABASE_URL", "SUPABASE_ANON_KEY", "IMAGE_OPTIMIZER_URL"):
+    for name in ("GEMINI_API_KEY", "SUPABASE_URL", "SUPABASE_ANON_KEY"):
         monkeypatch.delenv(name, raising=False)
     results = hc.run(http=FakeSession([]))
     assert {r.status for r in results} == {hc.SKIP}

@@ -58,15 +58,11 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          IMAGE_OPTIMIZER_URL: ${{ vars.IMAGE_OPTIMIZER_URL }}
           ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
         run: |
           python3 - <<'PY'
           import base64, binascii, json, os, sys
           config = {k: os.environ[k] for k in ("SUPABASE_URL", "SUPABASE_ANON_KEY")}
-          # Unset variable -> keep the app's built-in default URL.
-          if os.environ.get("IMAGE_OPTIMIZER_URL"):
-              config["IMAGE_OPTIMIZER_URL"] = os.environ["IMAGE_OPTIMIZER_URL"]
           path = os.path.join(os.environ["RUNNER_TEMP"], "prod.json")
           with open(path, "w") as f:
               json.dump(config, f)

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import '../../../core/services/chat_service.dart';
-import '../../../core/services/image_optimizer_service.dart';
 
 class ChatMessage {
   final String text;
@@ -76,11 +75,11 @@ class ChatViewModel extends ChangeNotifier {
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.camera,
-        // Cap the size so the fallback path (optimizer unavailable) stays
-        // within the curator function's request limit.
-        maxWidth: 2048,
-        maxHeight: 2048,
-        imageQuality: 90,
+        // Resized and compressed on the device: plenty for the curator to
+        // recognise the work, and small enough to send quickly.
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 80,
       );
       if (image == null) return;
 
@@ -94,12 +93,9 @@ class ChatViewModel extends ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
-      // Optimize image using Rust Microservice
-      final optimizedBytes = await ImageOptimizerService.optimizeImage(imageBytes);
-
       final response = await _chatService.sendMessage(
         'Analyze this image and explain it as an art curator.',
-        imageBytes: optimizedBytes.toList(), // Convert back to List<int>
+        imageBytes: imageBytes,
       );
       
       _messages.add(ChatMessage(text: response, isUser: false));
