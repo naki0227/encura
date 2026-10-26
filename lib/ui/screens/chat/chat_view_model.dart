@@ -26,7 +26,11 @@ class ChatViewModel extends ChangeNotifier {
   List<ChatMessage> get messages => _messages;
   bool get isLoading => _isLoading;
 
-  Future<void> initialize(String? initialImageUrl) async {
+  Future<void> initialize(String? initialImageUrl, {String? question}) async {
+    if (question != null) {
+      await sendMessage(question);
+      return;
+    }
     if (initialImageUrl == null) return;
 
     _isLoading = true;

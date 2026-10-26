@@ -8,12 +8,15 @@ import '../../widgets/motion.dart';
 class ChatScreen extends StatelessWidget {
   final String? initialImageUrl;
 
-  const ChatScreen({super.key, this.initialImageUrl});
+  /// Asked as soon as the screen opens (from an artwork or a movement).
+  final String? initialQuestion;
+
+  const ChatScreen({super.key, this.initialImageUrl, this.initialQuestion});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => ChatViewModel()..initialize(initialImageUrl),
+      create: (_) => ChatViewModel()..initialize(initialImageUrl, question: initialQuestion),
       child: const _ChatScreenContent(),
     );
   }
