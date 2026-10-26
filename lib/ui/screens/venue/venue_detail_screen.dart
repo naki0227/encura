@@ -68,7 +68,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
             children: <Widget>[
               ListTile(
                 leading: const Icon(Icons.camera_alt),
-                title: const Text('Camera'),
+                title: const Text('カメラで撮る'),
                 onTap: () {
                   Navigator.pop(context);
                   _uploadMap(ImageSource.camera);
@@ -76,7 +76,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library),
-                title: const Text('Gallery'),
+                title: const Text('写真から選ぶ'),
                 onTap: () {
                   Navigator.pop(context);
                   _uploadMap(ImageSource.gallery);
@@ -100,7 +100,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Verifying image with AI...')),
+      const SnackBar(content: Text('AIでマップか確かめています…')),
     );
 
     final File imageFile = File(image.path);
@@ -111,7 +111,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
 
     if (result == MapUploadResult.uploaded) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Map verified and uploaded!')),
+        const SnackBar(content: Text('マップを投稿しました')),
       );
       _loadMaps(); // Refresh list
     } else {
@@ -119,10 +119,10 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text(notMap ? 'Not a Map' : 'Upload Failed'),
+          title: Text(notMap ? 'マップではないようです' : '投稿できませんでした'),
           content: Text(notMap
-              ? 'AI determined that this image is not a map or floor guide. Please try again.'
-              : 'Could not upload the map. Please check your connection and try again.'),
+              ? 'AIの判定では、館内マップや案内図ではありませんでした。別の写真でお試しください。'
+              : 'マップを投稿できませんでした。通信状況を確かめて、もう一度お試しください。'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -139,7 +139,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not launch $url')),
+          SnackBar(content: Text('ページを開けませんでした')),
         );
       }
     }
@@ -148,8 +148,8 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final venueName = widget.venue['name'] ?? 'Unknown Venue';
-    final venueAddress = widget.venue['address'] ?? 'Address not available';
+    final venueName = widget.venue['name'] ?? '美術館';
+    final venueAddress = widget.venue['address'] ?? '住所の情報がありません';
     final websiteUrl = widget.venue['website_url'];
 
     return Scaffold(
@@ -196,7 +196,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                     OutlinedButton.icon(
                       onPressed: () => _launchUrl(websiteUrl),
                       icon: const Icon(Icons.language),
-                      label: const Text('Visit Official Site'),
+                      label: const Text('公式サイト'),
                     ),
                   ],
                 ],
@@ -210,13 +210,13 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Community Maps',
+                    'みんなの館内マップ',
                     style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   TextButton.icon(
                     onPressed: _showImageSourceSelection,
                     icon: const Icon(Icons.add_a_photo),
-                    label: const Text('Add Map'),
+                    label: const Text('マップを追加'),
                   ),
                 ],
               ),
@@ -239,19 +239,19 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                       Icon(Icons.map_outlined, size: 48, color: theme.disabledColor),
                       const SizedBox(height: 12),
                       Text(
-                        'No maps yet.',
+                        'まだマップがありません。',
                         style: theme.textTheme.bodyLarge?.copyWith(color: theme.disabledColor),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Be the first to share a floor guide!',
+                        '館内の案内図を撮って、最初のひとりになりませんか。',
                         style: theme.textTheme.bodySmall?.copyWith(color: theme.disabledColor),
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
                         onPressed: _showImageSourceSelection,
                         icon: const Icon(Icons.camera_alt),
-                        label: const Text('Scan Venue Map'),
+                        label: const Text('館内マップを撮る'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: theme.primaryColor,
                           foregroundColor: Colors.black,
@@ -335,7 +335,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
               child: Text(
-                'Upcoming Events',
+                'この館の展覧会',
                 style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
@@ -346,7 +346,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Text(
-                  'No upcoming events found for this venue.',
+                  'この館で予定されている展覧会は、まだ見つかっていません。',
                   style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
                 ),
               )

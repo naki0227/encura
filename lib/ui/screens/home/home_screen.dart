@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:encura/core/repositories/event_repository.dart';
 import 'package:encura/core/services/event_service.dart';
 import '../event/event_detail_screen.dart';
@@ -13,9 +12,11 @@ import 'package:encura/core/models/trending_article.dart';
 import 'package:encura/ui/screens/venue/venue_search_screen.dart';
 import 'package:encura/ui/screens/settings/settings_screen.dart';
 import 'package:encura/ui/screens/archive/archive_screen.dart';
-import 'package:encura/ui/widgets/daily_art_detail_dialog.dart';
+import 'package:encura/ui/widgets/content_sheets.dart';
 import '../../../core/utils/event_order.dart';
 import '../../../core/utils/image_url.dart';
+import '../../theme/tokens.dart';
+import '../../widgets/motion.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -32,6 +33,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ArtEvent> _events = [];
   /// Where the user is, once location is allowed; the list is then nearest first.
   LatLng? _here;
+  /// Cards that already played their entrance, so scrolling back does not replay it.
+  final Set<Object> _revealed = {};
   DailyColumn? _dailyColumn;
   List<TrendingArticle> _trendingArticles = [];
   bool _isLoading = true;
@@ -94,52 +97,9 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _showColumnDetails(DailyColumn column) {
-    showDialog(
-      context: context,
-      builder: (context) => DailyArtDetailDialog(column: column),
-    );
-  }
+  void _showColumnDetails(DailyColumn column) => showDailyArt(context, column);
 
-  void _showArticleDetails(TrendingArticle article) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(article.title),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (article.imageUrl.isNotEmpty)
-                Image.network(
-                  _sanitizeUrl(article.imageUrl),
-                  errorBuilder: (context, error, stackTrace) => const SizedBox(),
-                ),
-              const SizedBox(height: 16),
-              Text(article.content ?? article.summary),
-              if (article.sourceUrl != null && article.sourceUrl!.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                InkWell(
-                  onTap: () => _openSource(article.sourceUrl!),
-                  child: Text(
-                    'Source: ${article.sourceUrl}',
-                    style: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
-                  ),
-                ),
-              ]
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
+  void _showArticleDetails(TrendingArticle article) => showNewsArticle(context, article);
 
   String _sanitizeUrl(String url) => normalizeImageUrl(url);
 
@@ -172,13 +132,6 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ];
 
-  Future<void> _openSource(String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri != null && await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -189,411 +142,353 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: _isLoading || _dailyColumn != null ? null : _actions(),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Palette.gold, strokeWidth: 2))
           : !_hasContent
               ? _buildEmptyState()
               : RefreshIndicator(
+                  color: Palette.gold,
+                  backgroundColor: Palette.wall,
                   onRefresh: _loadData,
                   child: CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                if (_dailyColumn != null)
-                  SliverAppBar(
-                    expandedHeight: MediaQuery.of(context).size.height * 0.6,
-                    pinned: true,
-                    stretch: true,
-                    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-
-
-                    actions: _actions(),
-                    flexibleSpace: FlexibleSpaceBar(
-                      stretchModes: const [
-                        StretchMode.zoomBackground,
-                        StretchMode.blurBackground,
-                      ],
-                      background: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          CachedNetworkImage(
-                            imageUrl: _sanitizeUrl(_dailyColumn!.imageUrl),
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(color: Colors.grey[900]),
-                            errorWidget: (context, url, error) {
-                              debugPrint('Today\'s Art Image load error: $error. URL: $url');
-                              return Container(
-                                color: Colors.grey[900],
-                                child: const Center(child: Icon(Icons.broken_image, color: Colors.white54)),
-                              );
-                            },
-                          ),
-                          const DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.black54,
-                                  Colors.black87,
-                                ],
-                                stops: [0.5, 0.8, 1.0],
-                              ),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      if (_dailyColumn != null) _buildTodaysArt(context, _dailyColumn!),
+                      if (_trendingArticles.isNotEmpty) _buildTopics(context),
+                      if (_events.isNotEmpty) ...[
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                            child: SectionHeading(
+                              label: _here == null ? 'Exhibitions' : 'Nearby',
+                              title: _here == null ? '開催中・まもなく' : '近くの展覧会',
                             ),
                           ),
-                          Positioned(
-                            bottom: 20,
-                            left: 20,
-                            right: 20,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(context).primaryColor,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: const Text(
-                                    "Today's Art",
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1.2,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  _dailyColumn!.title,
-                                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    shadows: [
-                                      const Shadow(
-                                        offset: Offset(0, 2),
-                                        blurRadius: 4.0,
-                                        color: Colors.black,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  _dailyColumn!.artistName,
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: Colors.white70,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  onPressed: () => _showColumnDetails(_dailyColumn!),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white.withValues(alpha: 0.2),
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                      side: const BorderSide(color: Colors.white54),
-                                    ),
-                                  ),
-                                  child: const Text("Read More"),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                if (_trendingArticles.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 24.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 4,
-                                  height: 24,
-                                  color: Theme.of(context).primaryColor,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  "Trending Topics",
-                                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.0,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            height: 280, // Increased height for poster ratio
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              itemCount: _trendingArticles.length,
-                              itemBuilder: (context, index) {
-                                final article = _trendingArticles[index];
-                                return GestureDetector(
-                                  onTap: () => _showArticleDetails(article),
-                                  child: Container(
-                                    width: 180, // Fixed width for poster look
-                                    margin: const EdgeInsets.only(right: 16),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(
-                                          child: Card(
-                                            clipBehavior: Clip.antiAlias,
-                                            elevation: 8,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                            child: Stack(
-                                              fit: StackFit.expand,
-                                              children: [
-                                                article.imageUrl.isNotEmpty
-                                                    ? CachedNetworkImage(
-                                                        imageUrl: _sanitizeUrl(article.imageUrl),
-                                                        fit: BoxFit.cover,
-                                                        placeholder: (context, url) => Container(color: Colors.grey[800]),
-                                                        errorWidget: (context, url, error) {
-                                                          debugPrint('Trending Topic Image load error: $error. URL: $url');
-                                                          return _noImageCover(context);
-                                                        },
-                                                      )
-                                                    : _noImageCover(context),
-                                                Positioned(
-                                                  top: 8,
-                                                  right: 8,
-                                                  child: Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.redAccent,
-                                                      borderRadius: BorderRadius.circular(4),
-                                                      boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
-                                                    ),
-                                                    child: Text(
-                                                      article.keyword ?? "HOT",
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 10,
-                                                        fontWeight: FontWeight.w900,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          article.title,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                            fontWeight: FontWeight.bold,
-                                            height: 1.2,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 4,
-                          height: 24,
-                          color: Theme.of(context).primaryColor,
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          "Nearby Events",
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.0,
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) => _buildEventCard(context, _events[index]),
+                              childCount: _events.length,
+                            ),
                           ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final event = _events[index];
-                        // A running show is worth visiting before it closes;
-                        // an upcoming one, from its opening day.
-                        final running = isRunning(event, DateTime.now());
-                        final stubDate = running ? event.endDate : event.startDate;
-                        final km = distanceKm(event, _here);
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).cardTheme.color,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
-                          ),
-                          child: InkWell(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => EventDetailScreen(event: event),
-                                ),
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(12),
-                            child: IntrinsicHeight(
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  // Ticket Stub (Date)
-                                  Container(
-                                    width: 80,
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                                      borderRadius: const BorderRadius.only(
-                                        topLeft: Radius.circular(12),
-                                        bottomLeft: Radius.circular(12),
-                                      ),
-                                      border: Border(right: BorderSide(color: Colors.white.withValues(alpha: 0.1), width: 1)),
-                                    ),
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          "${stubDate.month}",
-                                          style: TextStyle(
-                                            color: Theme.of(context).primaryColor,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                        Text(
-                                          "${stubDate.day}",
-                                          style: TextStyle(
-                                            color: Theme.of(context).primaryColor,
-                                            fontWeight: FontWeight.w900,
-                                            fontSize: 24,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Container(
-                                          width: 40,
-                                          height: 1,
-                                          color: Theme.of(context).primaryColor.withValues(alpha: 0.5),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          running ? 'まで' : 'から',
-                                          style: TextStyle(
-                                            color: Theme.of(context).primaryColor,
-                                            fontSize: 11,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  // Ticket Body (Details)
-                                  Expanded(
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(16.0),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            event.title,
-                                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Row(
-                                            children: [
-                                              Icon(Icons.location_on, size: 14, color: Colors.grey[400]),
-                                              const SizedBox(width: 4),
-                                              Expanded(
-                                                child: Text(
-                                                  km == null
-                                                      ? event.venue
-                                                      : '${event.venue}・${km < 10 ? km.toStringAsFixed(1) : km.round()} km',
-                                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                                    color: Colors.grey[400],
-                                                  ),
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Row(
-                                            children: [
-                                              Icon(Icons.calendar_today, size: 14, color: Colors.grey[400]),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                "${event.startDate.year}/${event.startDate.month}/${event.startDate.day} - ${event.endDate.year}/${event.endDate.month}/${event.endDate.day}",
-                                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                                  color: Colors.grey[400],
-                                                  fontSize: 10,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                      childCount: _events.length,
-                    ),
-                  ),
-                ),
-              ],
-            ),
                 ),
     );
   }
 
-  /// News without a usable image: a quiet cover instead of a broken-image icon.
-  Widget _noImageCover(BuildContext context) {
-    final accent = Theme.of(context).primaryColor;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [accent.withValues(alpha: 0.25), Colors.grey[900]!],
+  Widget _buildTodaysArt(BuildContext context, DailyColumn column) {
+    final reduced = Motion.reduced(context);
+    return SliverAppBar(
+      expandedHeight: MediaQuery.of(context).size.height * 0.6,
+      pinned: true,
+      stretch: true,
+      backgroundColor: Palette.room,
+      actions: _actions(),
+      flexibleSpace: FlexibleSpaceBar(
+        stretchModes: const [StretchMode.zoomBackground],
+        background: Stack(
+          fit: StackFit.expand,
+          children: [
+            // The work settles into place once (1.03 → 1), like a light coming up.
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: reduced ? 1 : 1.03, end: 1),
+              duration: const Duration(milliseconds: 2000),
+              curve: Motion.curve,
+              builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
+              child: CachedNetworkImage(
+                imageUrl: _sanitizeUrl(column.imageUrl),
+                fit: BoxFit.cover,
+                fadeInDuration: reduced ? Duration.zero : Motion.slow,
+                fadeInCurve: Motion.curve,
+                placeholder: (context, url) => Container(color: Palette.wall),
+                errorWidget: (context, url, error) {
+                  debugPrint('Today\'s Art Image load error: $error. URL: $url');
+                  return Container(color: Palette.wall);
+                },
+              ),
+            ),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0x66000000), Colors.transparent, Colors.transparent, Color(0xE6000000)],
+                  stops: [0, 0.18, 0.55, 1],
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 24,
+              left: 20,
+              right: 20,
+              child: _FadeWhenCollapsed(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const PhotoTag('今日の一枚'),
+                    const SizedBox(height: 14),
+                    Text(
+                      column.title,
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            color: Palette.text,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.5,
+                            height: 1.3,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      column.artistName,
+                      style: const TextStyle(color: Color(0xCCFFFFFF), fontSize: 14, letterSpacing: 1),
+                    ),
+                    const SizedBox(height: 18),
+                    OutlinedButton.icon(
+                      onPressed: () => _showColumnDetails(column),
+                      icon: const Icon(Icons.arrow_forward, size: 16),
+                      iconAlignment: IconAlignment.end,
+                      label: const Text('解説を読む'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Palette.text,
+                        side: const BorderSide(color: Color(0x99FFFFFF)),
+                        shape: const StadiumBorder(),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        textStyle: const TextStyle(fontSize: 13, letterSpacing: 1.5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-      child: Center(
-        child: Icon(Icons.article_outlined, size: 40, color: accent.withValues(alpha: 0.7)),
+    );
+  }
+
+  Widget _buildTopics(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(0, 32, 0, 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: SectionHeading(label: 'Topics', title: '美術のニュース'),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 262,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: _trendingArticles.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final article = _trendingArticles[index];
+                  return Reveal(
+                    id: 'topic-${article.title}',
+                    seen: _revealed,
+                    child: Pressable(
+                      onTap: () => _showArticleDetails(article),
+                      child: SizedBox(
+                        width: 168,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Container(
+                                clipBehavior: Clip.antiAlias,
+                                decoration: BoxDecoration(
+                                  color: Palette.frame,
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: Palette.line),
+                                ),
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    article.imageUrl.isNotEmpty
+                                        ? CachedNetworkImage(
+                                            imageUrl: _sanitizeUrl(article.imageUrl),
+                                            fit: BoxFit.cover,
+                                            fadeInCurve: Motion.curve,
+                                            placeholder: (context, url) => Container(color: Palette.frame),
+                                            errorWidget: (context, url, error) {
+                                              debugPrint('Trending Topic Image load error: $error. URL: $url');
+                                              return _noImageCover(context, article.keyword);
+                                            },
+                                          )
+                                        : _noImageCover(context, article.keyword),
+                                    // Without a photo the cover already shows the category.
+                                    if (article.imageUrl.isNotEmpty)
+                                      Positioned(top: 10, left: 10, child: PhotoTag(article.keyword ?? 'ニュース')),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              article.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Palette.text,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                height: 1.5,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEventCard(BuildContext context, ArtEvent event) {
+    final today = DateTime.now();
+    // A running show is worth visiting before it closes; an upcoming one,
+    // from its opening day.
+    final running = isRunning(event, today);
+    final stubDate = running ? event.endDate : event.startDate;
+    final km = distanceKm(event, _here);
+    final status = _eventStatus(event, today);
+    return Reveal(
+      id: 'event-${event.id}',
+      seen: _revealed,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Pressable(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => EventDetailScreen(event: event)),
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Palette.frame,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: Palette.line),
+            ),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Ticket stub (date)
+                  Container(
+                    width: 72,
+                    decoration: const BoxDecoration(
+                      border: Border(right: BorderSide(color: Palette.line)),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${stubDate.month}月',
+                          style: const TextStyle(color: Palette.textSub, fontSize: 11, letterSpacing: 1),
+                        ),
+                        Text(
+                          '${stubDate.day}',
+                          style: const TextStyle(color: Palette.text, fontSize: 28, fontWeight: FontWeight.w300, height: 1.2),
+                        ),
+                        Text(
+                          running ? 'まで' : 'から',
+                          style: const TextStyle(color: Palette.textSub, fontSize: 11, letterSpacing: 1),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Ticket body (details)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            status.label,
+                            style: TextStyle(
+                              color: status.urgent ? Palette.gold : Palette.textSub,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            event.title,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Palette.text,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              height: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            km == null
+                                ? event.venue
+                                : '${event.venue}・${km < 10 ? km.toStringAsFixed(1) : km.round()} km',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Palette.textSub, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// What matters about the dates right now, in a few characters.
+  ({String label, bool urgent}) _eventStatus(ArtEvent event, DateTime today) {
+    final day = DateTime(today.year, today.month, today.day);
+    int daysTo(DateTime d) => DateTime(d.year, d.month, d.day).difference(day).inDays;
+    if (isRunning(event, today)) {
+      final left = daysTo(event.endDate);
+      if (left == 0) return (label: '本日まで', urgent: true);
+      if (left <= 7) return (label: 'あと$left日で終了', urgent: true);
+      return (label: '開催中', urgent: false);
+    }
+    final until = daysTo(event.startDate);
+    if (until <= 7) return (label: 'あと$until日で開幕', urgent: true);
+    return (label: 'まもなく開幕', urgent: false);
+  }
+
+  /// News without a usable image: the category set large and quiet, like a
+  /// placard on an empty wall, instead of a broken-image icon.
+  Widget _noImageCover(BuildContext context, String? keyword) {
+    return Container(
+      color: Palette.frame,
+      alignment: Alignment.bottomLeft,
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+      child: Text(
+        keyword ?? 'ニュース',
+        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: const Color(0x33FFFFFF),
+              fontWeight: FontWeight.w700,
+              height: 1.2,
+            ),
       ),
     );
   }
@@ -605,7 +500,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off, size: 48, color: Colors.grey),
+            const Icon(Icons.cloud_off, size: 48, color: Palette.textSub),
             const SizedBox(height: 16),
             const Text(
               '情報を読み込めませんでした。\n通信状況を確認して、もう一度お試しください。',
@@ -624,5 +519,24 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+}
+
+/// Fades the Today's Art caption out as the header collapses, so the title is
+/// never cut in half by the pinned bar.
+class _FadeWhenCollapsed extends StatelessWidget {
+  const _FadeWhenCollapsed({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = context.dependOnInheritedWidgetOfExactType<FlexibleSpaceBarSettings>();
+    if (settings == null) return child;
+    final range = settings.maxExtent - settings.minExtent;
+    final open = range <= 0 ? 1.0 : ((settings.currentExtent - settings.minExtent) / range).clamp(0.0, 1.0);
+    // Fully visible above 70% open, gone below 40%.
+    final opacity = ((open - 0.4) / 0.3).clamp(0.0, 1.0);
+    return Opacity(opacity: opacity, child: IgnorePointer(ignoring: opacity == 0, child: child));
   }
 }

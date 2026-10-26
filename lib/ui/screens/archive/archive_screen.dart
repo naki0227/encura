@@ -4,7 +4,7 @@ import 'package:encura/core/models/daily_column.dart';
 import 'package:encura/core/models/trending_article.dart';
 import 'package:encura/core/repositories/daily_column_repository.dart';
 import 'package:encura/core/repositories/trending_repository.dart';
-import 'package:encura/ui/widgets/daily_art_detail_dialog.dart';
+import 'package:encura/ui/widgets/content_sheets.dart';
 import '../../../core/utils/image_url.dart';
 
 class ArchiveScreen extends StatefulWidget {
@@ -121,53 +121,20 @@ class _ArchiveScreenState extends State<ArchiveScreen> with SingleTickerProvider
 
   String _sanitizeUrl(String url) => normalizeImageUrl(url);
 
-  void _showColumnDetails(DailyColumn column) {
-    showDialog(
-      context: context,
-      builder: (context) => DailyArtDetailDialog(column: column),
-    );
-  }
+  void _showColumnDetails(DailyColumn column) => showDailyArt(context, column);
 
-  void _showArticleDetails(TrendingArticle article) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(article.title),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (article.imageUrl.isNotEmpty)
-                Image.network(
-                  _sanitizeUrl(article.imageUrl),
-                  errorBuilder: (context, error, stackTrace) => const SizedBox(),
-                ),
-              const SizedBox(height: 16),
-              Text(article.content ?? article.summary),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
+  void _showArticleDetails(TrendingArticle article) => showNewsArticle(context, article);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Archive'),
+        title: const Text('アーカイブ'),
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
-            Tab(text: 'Daily Art'),
-            Tab(text: 'Trending Topics'),
+            Tab(text: '今日の一枚'),
+            Tab(text: '美術のニュース'),
           ],
         ),
       ),
@@ -178,7 +145,7 @@ class _ArchiveScreenState extends State<ArchiveScreen> with SingleTickerProvider
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search...',
+                hintText: 'キーワードで探す',
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
