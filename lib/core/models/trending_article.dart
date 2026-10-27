@@ -1,3 +1,5 @@
+import 'image_credit.dart';
+
 class TrendingArticle {
   final String id;
   final String title;
@@ -8,6 +10,7 @@ class TrendingArticle {
 
   final String? keyword;
   final String? content;
+  final ImageCredit imageCredit;
 
   TrendingArticle({
     required this.id,
@@ -18,6 +21,7 @@ class TrendingArticle {
     required this.publishedAt,
     this.keyword,
     this.content,
+    this.imageCredit = const ImageCredit(imageUrl: ''),
   });
 
   factory TrendingArticle.fromJson(Map<String, dynamic> json) {
@@ -32,6 +36,7 @@ class TrendingArticle {
           : DateTime.now(),
       keyword: json['keyword'],
       content: json['content'],
+      imageCredit: ImageCredit.fromJson(json),
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'image_credit.dart';
+
 class DailyColumn {
   final String id;
   final String title;
@@ -6,6 +8,7 @@ class DailyColumn {
   final String content;
   final DateTime displayDate;
   final String? affiliateUrl;
+  final ImageCredit imageCredit;
 
   DailyColumn({
     required this.id,
@@ -15,6 +18,7 @@ class DailyColumn {
     required this.content,
     required this.displayDate,
     this.affiliateUrl,
+    this.imageCredit = const ImageCredit(imageUrl: ''),
   });
 
   factory DailyColumn.fromJson(Map<String, dynamic> json) {
@@ -26,6 +30,7 @@ class DailyColumn {
       content: json['content'],
       displayDate: DateTime.parse(json['display_date']),
       affiliateUrl: json['affiliate_url'],
+      imageCredit: ImageCredit.fromJson(json),
     );
   }
 }

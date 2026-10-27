@@ -1,16 +1,17 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/utils/image_url.dart';
+import '../../core/models/image_credit.dart';
 import '../theme/tokens.dart';
 import 'motion.dart';
+import 'art_image.dart';
 
 /// Opens a full-height reading view for a news item or an artwork text:
 /// the picture on top, then a quiet column of text set for reading.
 Future<void> showReadingSheet(
   BuildContext context, {
   String imageUrl = '',
+  ImageCredit? imageCredit,
   String? tag,
   String? meta,
   required String title,
@@ -38,6 +39,7 @@ Future<void> showReadingSheet(
       builder: (context, controller) => _ReadingView(
         controller: controller,
         imageUrl: imageUrl,
+        imageCredit: imageCredit,
         tag: tag,
         meta: meta,
         title: title,
@@ -54,6 +56,7 @@ class _ReadingView extends StatelessWidget {
   const _ReadingView({
     required this.controller,
     required this.imageUrl,
+    required this.imageCredit,
     required this.tag,
     required this.meta,
     required this.title,
@@ -65,6 +68,7 @@ class _ReadingView extends StatelessWidget {
 
   final ScrollController controller;
   final String imageUrl;
+  final ImageCredit? imageCredit;
   final String? tag;
   final String? meta;
   final String title;
@@ -101,18 +105,21 @@ class _ReadingView extends StatelessWidget {
                 child: Container(
                   color: Palette.room,
                   width: double.infinity,
-                  child: CachedNetworkImage(
-                    imageUrl: normalizeImageUrl(imageUrl),
-                    httpHeaders: imageHeaders,
+                  child: ArtImage(
+                    imageUrl,
                     fit: BoxFit.contain,
-                    fadeInCurve: Motion.curve,
-                    placeholder: (context, url) => const SizedBox(height: 280),
-                    errorWidget: (context, url, error) => const SizedBox(height: 24),
+                    placeholder: const SizedBox(height: 280),
+                    error: const SizedBox(height: 24),
                   ),
                 ),
               )
             else
               const SizedBox(height: 40),
+            if (imageUrl.isNotEmpty && imageCredit != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                child: Align(alignment: Alignment.centerRight, child: ImageCreditLine(imageCredit!)),
+              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 48),
               child: Column(

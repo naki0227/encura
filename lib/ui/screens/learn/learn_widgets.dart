@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -7,8 +6,8 @@ import '../../../core/models/art_knowledge.dart';
 import '../../../core/services/event_service.dart';
 import '../../../core/services/exhibitions_store.dart';
 import '../../../core/utils/exhibition_match.dart';
-import '../../../core/utils/image_url.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/art_image.dart';
 import '../../widgets/motion.dart';
 import '../chat/chat_screen.dart';
 import '../event/event_detail_screen.dart';
@@ -16,55 +15,14 @@ import 'artist_screen.dart';
 import 'artwork_screen.dart';
 
 /// A picture from the library, quiet while it loads.
-///
-/// Wikimedia throttles bursts (HTTP 429) when many thumbnails load at once,
-/// so a failed image is tried again after a pause, twice at most.
-class KnowledgeImage extends StatefulWidget {
+class KnowledgeImage extends StatelessWidget {
   const KnowledgeImage(this.url, {super.key, this.fit = BoxFit.cover});
 
   final String url;
   final BoxFit fit;
 
   @override
-  State<KnowledgeImage> createState() => _KnowledgeImageState();
-}
-
-class _KnowledgeImageState extends State<KnowledgeImage> {
-  static const _maxRetries = 2;
-  int _attempt = 0;
-  bool _retryScheduled = false;
-
-  void _scheduleRetry(String url) {
-    if (_retryScheduled || _attempt >= _maxRetries) return;
-    _retryScheduled = true;
-    Future.delayed(Duration(seconds: 3 * (_attempt + 1)), () async {
-      await CachedNetworkImage.evictFromCache(url);
-      if (!mounted) return;
-      setState(() {
-        _attempt++;
-        _retryScheduled = false;
-      });
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.url.isEmpty) return Container(color: Palette.frame);
-    final url = normalizeImageUrl(widget.url);
-    return CachedNetworkImage(
-      key: ValueKey(_attempt),
-      imageUrl: url,
-      httpHeaders: imageHeaders,
-      fit: widget.fit,
-      fadeInCurve: Motion.curve,
-      fadeInDuration: Motion.reduced(context) ? Duration.zero : Motion.mid,
-      placeholder: (context, _) => Container(color: Palette.frame),
-      errorWidget: (context, _, __) {
-        _scheduleRetry(url);
-        return Container(color: Palette.frame);
-      },
-    );
-  }
+  Widget build(BuildContext context) => ArtImage(url, fit: fit);
 }
 
 /// A small card for an artwork in horizontal rows and the library grid.

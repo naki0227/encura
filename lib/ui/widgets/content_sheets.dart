@@ -5,6 +5,7 @@ import '../../core/models/daily_column.dart';
 import '../../core/models/trending_article.dart';
 import '../theme/tokens.dart';
 import 'reading_sheet.dart';
+import '../../core/config/app_config.dart';
 
 String _date(DateTime d) {
   final l = d.toLocal();
@@ -16,6 +17,7 @@ Future<void> showDailyArt(BuildContext context, DailyColumn column) {
   return showReadingSheet(
     context,
     imageUrl: column.imageUrl,
+    imageCredit: column.imageCredit,
     tag: '今日の一枚',
     meta: _date(column.displayDate),
     title: column.title,
@@ -45,6 +47,7 @@ Future<void> showNewsArticle(BuildContext context, TrendingArticle article) {
   return showReadingSheet(
     context,
     imageUrl: article.imageUrl,
+    imageCredit: article.imageCredit,
     tag: article.keyword ?? 'ニュース',
     meta: _date(article.publishedAt),
     title: article.title,
@@ -57,7 +60,10 @@ Future<void> _openShop(BuildContext context, DailyColumn column) async {
   var url = column.affiliateUrl ?? '';
   if (url.isEmpty) {
     // Fallback to Amazon search
-    url = 'https://www.amazon.co.jp/s?k=${Uri.encodeComponent(column.artistName)}';
+    url = Uri.https('www.amazon.co.jp', '/s', {
+      'k': column.artistName,
+      if (AppConfig.amazonAssociateTag.isNotEmpty) 'tag': AppConfig.amazonAssociateTag,
+    }).toString();
   }
   var opened = false;
   try {

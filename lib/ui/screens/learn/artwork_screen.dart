@@ -4,6 +4,7 @@ import '../../../core/models/art_knowledge.dart';
 import '../../../core/services/favorites_store.dart';
 import '../../../core/utils/exhibition_match.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/art_image.dart';
 import '../../widgets/motion.dart';
 import 'learn_widgets.dart';
 import 'movement_screen.dart';
@@ -62,11 +63,15 @@ class ArtworkScreen extends StatelessWidget {
               child: KnowledgeImage(artwork.imageUrl, fit: BoxFit.contain),
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.only(top: 8, right: 16),
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Text('タップで拡大', style: TextStyle(color: Palette.textSub, fontSize: 11)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 16, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: ImageCreditLine(artwork.imageCredit)),
+                const SizedBox(width: 12),
+                const Text('タップで拡大', style: TextStyle(color: Palette.textSub, fontSize: 11)),
+              ],
             ),
           ),
           Padding(

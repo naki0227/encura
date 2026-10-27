@@ -5,6 +5,8 @@ name: Content Build
 # limit some cloud addresses). Push candidate JSON files to a branch named
 # claude/candidates-* under scripts/content/candidates/; the generated
 # migration(s) and the Accepted/Rejected report come back as an artifact.
+# An empty file scripts/content/candidates/image_credits also runs
+# scripts/content/image_credits.py (licenses for already published images).
 # Commit the migration on a claude/content-* branch as usual (see
 # docs/CONTENT_ROUTINE.md); the candidates branch itself is never merged.
 on:
@@ -28,7 +30,7 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/out"
           status=0
-          for f in scripts/content/candidates/*.json; do
+          for f in $(ls scripts/content/candidates/*.json 2>/dev/null); do
             echo "## $f" | tee -a "$RUNNER_TEMP/out/report.md"
             python scripts/content/build_migration.py "$f" --out-dir "$RUNNER_TEMP/out" \
               | tee -a "$RUNNER_TEMP/out/report.md" || status=$?
@@ -37,6 +39,14 @@ jobs:
           done
           cat "$RUNNER_TEMP/out/report.md" >> "$GITHUB_STEP_SUMMARY"
           ls "$RUNNER_TEMP/out"
+      - name: Image credits for published rows
+        if: hashFiles('scripts/content/candidates/image_credits') != ''
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          python scripts/content/image_credits.py --out-dir "$RUNNER_TEMP/out" | tee "$RUNNER_TEMP/out/credits.md"
+          cat "$RUNNER_TEMP/out/credits.md" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: content-migrations
