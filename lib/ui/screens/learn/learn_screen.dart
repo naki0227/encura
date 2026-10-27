@@ -6,10 +6,12 @@ import '../../../core/services/favorites_store.dart';
 import '../../../core/utils/recommend.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/motion.dart';
+import 'artists_screen.dart';
 import 'artwork_screen.dart';
 import 'learn_widgets.dart';
 import 'library_screen.dart';
 import 'movement_screen.dart';
+import 'quiz_screen.dart';
 
 /// The Learn tab: the flow of art as a timeline, and the library of works.
 /// Everything here is written content; the curator is an extra, not a need.
@@ -88,6 +90,13 @@ class _LearnScreenState extends State<LearnScreen> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
             child: _LibraryEntry(knowledge: k),
+          ),
+        ),
+        SliverToBoxAdapter(child: _FeaturedArtists(knowledge: k)),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+            child: _QuizEntry(knowledge: k),
           ),
         ),
         SliverToBoxAdapter(
@@ -454,6 +463,78 @@ class _RecommendationCard extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: Palette.gold, fontSize: 11, height: 1.5)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "画家から見る": the artists with the most works in the library, and the
+/// way to all of them.
+class _FeaturedArtists extends StatelessWidget {
+  const _FeaturedArtists({required this.knowledge});
+
+  final ArtKnowledge knowledge;
+
+  @override
+  Widget build(BuildContext context) {
+    final counts = <String, int>{};
+    for (final a in knowledge.artworks) {
+      counts[a.artist] = (counts[a.artist] ?? 0) + 1;
+    }
+    // Artists with a written profile and many works first; among equals,
+    // keep the order of when they were active.
+    int score(String name) => (counts[name] ?? 0) + (knowledge.artist(name) != null ? 2 : 0);
+    final names = [...knowledge.artistNames]..sort((a, b) => score(b).compareTo(score(a)));
+    return ArtistRow(
+      label: 'Artists',
+      title: '画家から見る',
+      names: names.take(16).toList(),
+      knowledge: knowledge,
+      trailing: TextButton(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ArtistsScreen(knowledge: knowledge)),
+        ),
+        child: Text('${knowledge.artistNames.length}人すべて', style: const TextStyle(color: Palette.gold)),
+      ),
+    );
+  }
+}
+
+class _QuizEntry extends StatelessWidget {
+  const _QuizEntry({required this.knowledge});
+
+  final ArtKnowledge knowledge;
+
+  @override
+  Widget build(BuildContext context) {
+    return Pressable(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => QuizScreen(knowledge: knowledge))),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Palette.frame,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Palette.line),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.visibility_outlined, color: Palette.gold, size: 22),
+            SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('この絵は誰の作品？', style: TextStyle(color: Palette.text, fontSize: 15, fontWeight: FontWeight.w700)),
+                  SizedBox(height: 4),
+                  Text('10問の作品当て。描き方の違いに目が慣れてきます。',
+                      style: TextStyle(color: Palette.textSub, fontSize: 12)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: Palette.textSub),
           ],
         ),
       ),

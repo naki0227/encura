@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/models/art_knowledge.dart';
+import '../../../core/utils/exhibition_match.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/motion.dart';
 import 'learn_widgets.dart';
@@ -19,6 +20,8 @@ class MovementScreen extends StatelessWidget {
     final into = knowledge.linksInto(movement.slug);
     final outOf = knowledge.linksOutOf(movement.slug);
     final works = knowledge.worksOf(movement.slug);
+    final artists = knowledge.artistsOf(movement.slug);
+    final concurrent = knowledge.concurrent(movement);
 
     return Scaffold(
       body: CustomScrollView(
@@ -106,13 +109,33 @@ class MovementScreen extends StatelessWidget {
               ),
             ),
           SliverToBoxAdapter(
+            child: ArtistRow(label: 'Artists', title: 'この流れの画家', names: artists, knowledge: knowledge),
+          ),
+          SliverToBoxAdapter(
             child: ArtworkRow(label: 'Works', title: 'この流れの作品', works: works, knowledge: knowledge),
+          ),
+          if (concurrent.isNotEmpty)
+            SliverToBoxAdapter(child: _ConcurrentRow(movements: concurrent, knowledge: knowledge)),
+          SliverToBoxAdapter(
+            child: ExhibitionsSection(
+              keys: [
+                movement.nameJa,
+                for (final name in artists) ...artistKeys(name, knowledge.artist(name)),
+              ],
+              title: 'この流れに出会える展覧会',
+            ),
           ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 36, 24, 48),
-              child: AskCuratorButton(
-                question: '${movement.nameJa}について、代表的な作品を例にして、前後の時代とのつながりも含めてもっと教えてください。',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AskCuratorButton(
+                    question: '${movement.nameJa}について、代表的な作品を例にして、前後の時代とのつながりも含めてもっと教えてください。',
+                  ),
+                  BookLink(query: '${movement.nameJa} 画集', label: '${movement.nameJa}の画集を探す'),
+                ],
               ),
             ),
           ),
@@ -185,6 +208,79 @@ class _LinkCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// "同じころ、ほかの地域では": movements elsewhere in the same years.
+class _ConcurrentRow extends StatelessWidget {
+  const _ConcurrentRow({required this.movements, required this.knowledge});
+
+  final List<Movement> movements;
+  final ArtKnowledge knowledge;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 36),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24),
+            child: SectionHeading(label: 'Meanwhile', title: '同じころ、ほかの地域では'),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 176,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              itemCount: movements.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (context, i) {
+                final m = movements[i];
+                final cover = knowledge.coverOf(m.slug);
+                return Pressable(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => MovementScreen(movement: m, knowledge: knowledge)),
+                  ),
+                  child: SizedBox(
+                    width: 148,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          height: 100,
+                          width: double.infinity,
+                          clipBehavior: Clip.antiAlias,
+                          decoration: BoxDecoration(
+                            color: Palette.frame,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: Palette.line),
+                          ),
+                          child: cover.isEmpty ? null : KnowledgeImage(cover),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(m.nameJa,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Palette.text, fontSize: 13, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 2),
+                        Text('${m.regionLabel}・${m.period}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Palette.textSub, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

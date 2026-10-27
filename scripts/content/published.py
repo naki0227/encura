@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """List what earlier content migrations already published.
 
-    python scripts/content/published.py [--kind exhibition|daily art|news|venue|movement|movement link|artwork]
+    python scripts/content/published.py [--kind exhibition|daily art|news|venue|movement|movement link|artwork|artist]
 
 Reads the "-- item:" lines that build_migration.py writes at the top of
 every supabase/migrations/*_content_*.sql, newest first.
