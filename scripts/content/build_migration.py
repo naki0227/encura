@@ -6,8 +6,11 @@ saves them as JSON; this script decides what is publishable:
 
   * exhibitions: the official page must name the exhibition; the venue is
     geocoded from its address with the GSI address search
-  * Today's Art: the artwork must have an image on Wikidata/Commons credited
-    to the same artist
+  * Today's Art: the artwork must have an image credited to the same artist,
+    from a museum that publishes it as CC0 (the Met, the Art Institute of
+    Chicago, the Cleveland Museum of Art) or else from Wikidata/Commons; the
+    image's license must be public domain, CC0, CC BY or CC BY-SA, and its
+    license and credit are stored with the row
   * news: the source page must name the subject of the story
   * venues (museums listed in the app's venue search): the official site
     must name the museum; the address is geocoded with the GSI address search
@@ -39,7 +42,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from common import geo, images, web  # noqa: E402
+from common import geo, images, museums, web  # noqa: E402
+from common.image_info import ImageInfo, commons_info, is_allowed  # noqa: E402
 from content import sql  # noqa: E402
 
 JST = dt.timezone(dt.timedelta(hours=9))
@@ -111,6 +115,7 @@ class Checks:
 
     def __init__(self, offline: bool = False):
         self.offline = offline
+        self._info: dict[str, ImageInfo] = {}
 
     def page_naming(self, phrase: str, urls: list[str]) -> str | None:
         if self.offline:
@@ -121,10 +126,33 @@ class Checks:
         # Offline runs (CI's SQL check) still exercise the location columns.
         return (35.6812, 139.7671) if self.offline else geo.geocode(address)
 
-    def artwork_image(self, titles: list[str], artists: list[str]) -> str | None:
+    def artwork_image(self, titles: list[str], artists: list[str], collection: str | None = None) -> str | None:
+        """titles/artists: English first, then Japanese. With the holding
+        museum's name in `collection`, that museum's CC0 image comes first."""
         if self.offline:
-            return "https://upload.wikimedia.org/offline.jpg"
-        return images.find_artwork_image(titles, artists)
+            url = "https://upload.wikimedia.org/offline.jpg"
+            self._info[url] = ImageInfo(url, "Public domain", "", "")
+            return url
+        museum = museums.find(titles[0], artists[0], collection)
+        if museum:
+            self._info[museum.url] = museum
+            return museum.url
+        url = images.find_artwork_image(titles, artists)
+        if not url:
+            return None
+        info = commons_info(url)
+        if not info or not is_allowed(info.license):
+            return None
+        self._info[url] = info
+        return url
+
+    def image_credit(self, url: str) -> ImageInfo:
+        """License, credit and description page of an image found above."""
+        return self._info.get(url) or ImageInfo(url, "", "", "")
+
+
+def credit_values(info: ImageInfo) -> str:
+    return ", ".join(sql.text(v or None) for v in (info.license, info.credit, info.page))
 
 
 # --- exhibitions ------------------------------------------------------------------
@@ -185,9 +213,10 @@ def daily_statement(items, checks: Checks, report: Report) -> list[str]:
         seen.add(web.normalize(title))
         image = checks.artwork_image([clean(item.get("title_en")), title], [clean(item.get("artist_en")), artist])
         if not image:
-            report.no("daily art", label, "no image of this work by this artist on Wikidata")
+            report.no("daily art", label, "no freely licensed image of this work by this artist (museums, Wikidata)")
             continue
-        rows.append(f"({len(rows) + 1}, {sql.text(title)}, {sql.text(artist)}, {sql.text(image)}, {sql.text(content)})")
+        rows.append(f"({len(rows) + 1}, {sql.text(title)}, {sql.text(artist)}, {sql.text(image)}, {sql.text(content)}, "
+                    f"{credit_values(checks.image_credit(image))})")
         report.ok("daily art", label)
     if not rows:
         return []
@@ -195,7 +224,7 @@ def daily_statement(items, checks: Checks, report: Report) -> list[str]:
     # (JST), skipping works that were already shown. The range covers the days
     # already booked plus one per candidate, so every fresh work gets a day
     # (works queue up instead of being dropped).
-    return [f"""with candidate (n, title, artist, image_url, content) as (
+    return [f"""with candidate (n, title, artist, image_url, content, image_license, image_credit, image_page) as (
     values
     {(","+chr(10)+"    ").join(rows)}
 ), fresh as (
@@ -212,8 +241,8 @@ def daily_statement(items, checks: Checks, report: Report) -> list[str]:
         interval '1 day') as day
     where not exists (select 1 from public.daily_columns d where d.display_date = day::date)
 )
-insert into public.daily_columns (title, artist, image_url, content, display_date)
-select f.title, f.artist, f.image_url, f.content, d.display_date
+insert into public.daily_columns (title, artist, image_url, content, image_license, image_credit, image_page, display_date)
+select f.title, f.artist, f.image_url, f.content, f.image_license, f.image_credit, f.image_page, d.display_date
 from fresh f join free_day d using (k)
 on conflict (display_date) do nothing;"""]
 
@@ -271,8 +300,11 @@ def news_statements(items, checks: Checks, report: Report) -> list[str]:
         keyword = clean(item.get("keyword"))
         if keyword not in NEWS_KEYWORDS:
             keyword = "美術館"
-        out.append(f"""insert into public.trending_articles (title, summary, content, image_url, keyword, source_url)
-values ({sql.text(title)}, {sql.text(summary)}, {sql.text(content)}, {sql.text(image)}, {sql.text(keyword)}, {sql.text(verified)})
+        credit = checks.image_credit(image) if image else ImageInfo("", "", "", "")
+        out.append(f"""insert into public.trending_articles (title, summary, content, image_url, keyword, source_url,
+    image_license, image_credit, image_page)
+values ({sql.text(title)}, {sql.text(summary)}, {sql.text(content)}, {sql.text(image)}, {sql.text(keyword)}, {sql.text(verified)},
+        {credit_values(credit)})
 on conflict (source_url) do nothing;""")
         report.ok("news", label, verified)
     return out
@@ -349,16 +381,18 @@ def artwork_statements(items, checks: Checks, report: Report) -> list[str]:
             continue
         seen.add(key)
         title_en, artist_en = clean(item.get("title_en")), clean(item.get("artist_en"))
-        image = checks.artwork_image([title_en, title], [artist_en, artist])
+        image = checks.artwork_image([title_en, title], [artist_en, artist], clean(item.get("collection")))
         if not image:
-            report.no("artwork", label, "no image of this work by this artist on Wikidata")
+            report.no("artwork", label, "no freely licensed image of this work by this artist (museums, Wikidata)")
             continue
         year = parse_year(item.get("year"))
-        out.append(f"""insert into public.artworks (title, title_en, artist, artist_en, year, movement_slug, collection, image_url, content)
+        out.append(f"""insert into public.artworks (title, title_en, artist, artist_en, year, movement_slug, collection, image_url, content,
+    image_license, image_credit, image_page)
 values ({sql.text(title)}, {sql.text(title_en or None)}, {sql.text(artist)}, {sql.text(artist_en or None)},
         {"null" if year is None else year},
         (select slug from public.art_movements where slug = {sql.text(movement)}),
-        {sql.text(clean(item.get("collection")) or None)}, {sql.text(image)}, {sql.text(content)})
+        {sql.text(clean(item.get("collection")) or None)}, {sql.text(image)}, {sql.text(content)},
+        {credit_values(checks.image_credit(image))})
 on conflict (title, artist) do update set
     title_en = excluded.title_en,
     artist_en = excluded.artist_en,
@@ -366,7 +400,10 @@ on conflict (title, artist) do update set
     movement_slug = coalesce(excluded.movement_slug, public.artworks.movement_slug),
     collection = excluded.collection,
     image_url = excluded.image_url,
-    content = excluded.content;""")
+    content = excluded.content,
+    image_license = excluded.image_license,
+    image_credit = excluded.image_credit,
+    image_page = excluded.image_page;""")
         report.ok("artwork", label, movement)
     return out
 

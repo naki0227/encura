@@ -1,3 +1,5 @@
+import 'image_credit.dart';
+
 // Art history as the app teaches it: movements, how they connect, and
 // public-domain artworks. All rows are read-only content.
 
@@ -72,6 +74,7 @@ class Artwork {
   final String? collection;
   final String imageUrl;
   final String content;
+  final ImageCredit imageCredit;
 
   const Artwork({
     required this.id,
@@ -82,6 +85,7 @@ class Artwork {
     required this.collection,
     required this.imageUrl,
     required this.content,
+    this.imageCredit = const ImageCredit(imageUrl: ''),
   });
 
   factory Artwork.fromJson(Map<String, dynamic> json) => Artwork(
@@ -93,6 +97,7 @@ class Artwork {
         collection: json['collection'],
         imageUrl: json['image_url'] ?? '',
         content: json['content'] ?? '',
+        imageCredit: ImageCredit.fromJson(json),
       );
 
   String get yearLabel => year == null ? '' : '$year年';

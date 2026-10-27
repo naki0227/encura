@@ -1,4 +1,9 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+
+import '../config/app_config.dart';
 
 /// Wikimedia only serves thumbnails in these widths; any other width is
 /// refused with an HTML error page (https://w.wiki/GHai). Older crawler runs
@@ -36,3 +41,14 @@ String normalizeImageUrl(String url) {
 final Map<String, String>? imageHeaders = kIsWeb
     ? null
     : const {'User-Agent': 'EnCura/1.0.5 (+https://enludus.com; contact@enludus.com)'};
+
+/// Our own resized copy of an image in Supabase Storage, written by
+/// .github/workflows/mirror_images.yml (scripts/content/mirror_images.py):
+/// `SUPABASE_URL/storage/v1/object/public/art-images/(sha1 of url).jpg`.
+/// Null when the app has no Supabase URL. The copy may not exist yet; callers
+/// fall back to [url] itself.
+String? mirroredImageUrl(String url, {String base = AppConfig.supabaseUrl}) {
+  if (url.isEmpty || base.isEmpty) return null;
+  final name = sha1.convert(utf8.encode(url)).toString();
+  return '${base.replaceFirst(RegExp(r'/+$'), '')}/storage/v1/object/public/art-images/$name.jpg';
+}

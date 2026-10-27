@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:encura/core/repositories/event_repository.dart';
@@ -14,9 +13,9 @@ import 'package:encura/ui/screens/settings/settings_screen.dart';
 import 'package:encura/ui/screens/archive/archive_screen.dart';
 import 'package:encura/ui/widgets/content_sheets.dart';
 import '../../../core/utils/event_order.dart';
-import '../../../core/utils/image_url.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/motion.dart';
+import '../../widgets/art_image.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -101,7 +100,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showArticleDetails(TrendingArticle article) => showNewsArticle(context, article);
 
-  String _sanitizeUrl(String url) => normalizeImageUrl(url);
 
   bool get _hasContent => _dailyColumn != null || _trendingArticles.isNotEmpty || _events.isNotEmpty;
 
@@ -199,18 +197,7 @@ class _HomeScreenState extends State<HomeScreen> {
               duration: const Duration(milliseconds: 2000),
               curve: Motion.curve,
               builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
-              child: CachedNetworkImage(
-                imageUrl: _sanitizeUrl(column.imageUrl),
-                httpHeaders: imageHeaders,
-                fit: BoxFit.cover,
-                fadeInDuration: reduced ? Duration.zero : Motion.slow,
-                fadeInCurve: Motion.curve,
-                placeholder: (context, url) => Container(color: Palette.wall),
-                errorWidget: (context, url, error) {
-                  debugPrint('Today\'s Art Image load error: $error. URL: $url');
-                  return Container(color: Palette.wall);
-                },
-              ),
+              child: ArtImage(column.imageUrl, placeholder: Container(color: Palette.wall)),
             ),
             const DecoratedBox(
               decoration: BoxDecoration(
@@ -314,17 +301,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   fit: StackFit.expand,
                                   children: [
                                     article.imageUrl.isNotEmpty
-                                        ? CachedNetworkImage(
-                                            imageUrl: _sanitizeUrl(article.imageUrl),
-                                            httpHeaders: imageHeaders,
-                                            fit: BoxFit.cover,
-                                            fadeInCurve: Motion.curve,
-                                            placeholder: (context, url) => Container(color: Palette.frame),
-                                            errorWidget: (context, url, error) {
-                                              debugPrint('Trending Topic Image load error: $error. URL: $url');
-                                              return _noImageCover(context, article.keyword);
-                                            },
-                                          )
+                                        ? ArtImage(article.imageUrl, error: _noImageCover(context, article.keyword))
                                         : _noImageCover(context, article.keyword),
                                     // Without a photo the cover already shows the category.
                                     if (article.imageUrl.isNotEmpty)

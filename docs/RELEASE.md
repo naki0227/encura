@@ -42,9 +42,9 @@ DB への反映・ビルド・TestFlight・点検は、すべて GitHub Actions 
 | 種類 | 名前 | 中身 | 使う workflow |
 | :--- | :--- | :--- | :--- |
 | Secret | `SUPABASE_DB_URL` | 手順 1 の DB 接続文字列（パスワード入り） | DB Migrations |
-| Secret | `SUPABASE_ACCESS_TOKEN` | 手順 1 のアクセストークン | DB Migrations（Edge Function のデプロイ） |
-| Secret | `SUPABASE_PROJECT_REF` | 手順 1 の Project ref | DB Migrations（Edge Function のデプロイ） |
-| Secret | `SUPABASE_URL` | Project URL | iOS リリース・点検 |
+| Secret | `SUPABASE_ACCESS_TOKEN` | 手順 1 のアクセストークン | DB Migrations（Edge Function のデプロイ）・画像のコピー |
+| Secret | `SUPABASE_PROJECT_REF` | 手順 1 の Project ref | DB Migrations（Edge Function のデプロイ）・画像のコピー |
+| Secret | `SUPABASE_URL` | Project URL | iOS リリース・点検・画像のコピー |
 | Secret | `SUPABASE_ANON_KEY` | anon キー | iOS リリース・点検 |
 | Secret | `GEMINI_API_KEY` | 手順 2 のキー（点検ではモデル一覧を見るだけで、料金はかかりません） | 点検 |
 | Secret | `ASC_KEY_ID` | App Store Connect API キーの Key ID | iOS リリース |
@@ -85,6 +85,14 @@ App Store Connect API キーの作り方:
 
 DB の鍵は Claude に渡しません。Routine の作成は、手順 1〜4 が終わったら Claude に頼んでください。初回は今日の一枚を 20 点まとめて入れ、以後は毎日少しずつ足します。
 
+## 6.4 作品画像のコピー（自動）
+
+作品・今日の一枚・ニュースの画像は、Wikimedia Commons と、作品を CC0 で公開している美術館（メトロポリタン美術館、シカゴ美術館、クリーブランド美術館）から取っています。アプリが毎回そこへ取りに行くと、相手のサーバーに止められたときに画像が出なくなるため、縮小したコピーを Supabase Storage のバケット `art-images` に置き、アプリはまずそこから読みます（なければ元の画像を読む）。
+
+- コピーは **Actions → Mirror Images** が作ります。本番 DB の更新のあとと毎日 1 回動き、まだコピーのない画像だけを取りに行きます。手で **Run workflow** してもかまいません。
+- 書き込みに使う service_role キーは、実行のたびに `SUPABASE_ACCESS_TOKEN` で Supabase から読み出し、ログには出しません（リポジトリにも保存しません）。
+- 画像ごとにライセンスとクレジットを DB に持ち、クレジットが必要な画像（CC BY / CC BY-SA）は画像の下に表示します。パブリックドメイン・CC0・CC BY・CC BY-SA 以外の画像は載せません。
+
 ## 6.5 画集のリンク（Amazon アソシエイト、任意）
 
 「学ぶ」の画家・流派・作品のページに「画集を探す」ボタンを出せます。ボタンは Amazon の検索結果を開き、アソシエイトのタグ付きで購入されると紹介料が入ります。
@@ -97,7 +105,7 @@ DB の鍵は Claude に渡しません。Routine の作成は、手順 1〜4 が
 
 1. 手順 1〜4 が済んでいることを確認する。
 2. **Actions → iOS Release (TestFlight) → Run workflow** を実行する。
-   - `build_number` は空なら `pubspec.yaml` の値（今回は 14。7〜13 は 2026-10-26〜27 にアップロード済み）。同じ番号は二度上げられないので、作り直すときは 8, 9… を入れる。
+   - `build_number` は空なら `pubspec.yaml` の値（今回は 15。7〜14 は 2026-10-26〜27 にアップロード済み）。同じ番号は二度上げられないので、作り直すときは 8, 9… を入れる。
    - `v1.0.5` のようなタグを push しても動きます。
    - 初回は GitHub の Environment「release」が自動で作られます。承認者を付けたい場合は **Settings → Environments → release** で設定します。
 3. 15〜30 分ほどで、App Store Connect の TestFlight にビルドが出ます。輸出コンプライアンスは Info.plist で「該当なし（HTTPS のみ）」と申告済みなので、そのままテスターに配れます。
@@ -139,7 +147,7 @@ DB の鍵は Claude に渡しません。Routine の作成は、手順 1〜4 が
 ・AI学芸員（チャット）と作品スキャンが応答しなくなっていた問題を修正しました。
 ・会場マップの投稿で、AIによる判定が失敗する問題を修正しました。
 ・展覧会・ニュースは、公式サイトなどの出典で確認できたものだけを載せるようにしました。
-・作品やニュースの画像が表示されないことがある問題を修正しました。
+・作品やニュースの画像が表示されないことがある問題を修正しました。画像は EnCura のサーバーにも置き、より速く確実に表示されるようにしました。
 
 ご不便をおかけし申し訳ありませんでした。ご意見・不具合のご報告は contact@enludus.com までお寄せください。
 ```

@@ -22,7 +22,7 @@ class FakeChecks(bm.Checks):
     def geocode(self, address):
         return self.coords
 
-    def artwork_image(self, titles, artists):
+    def artwork_image(self, titles, artists, collection=None):
         return next((self.images[t] for t in titles if t in self.images), None)
 
 
@@ -58,7 +58,7 @@ def test_unverified_items_are_rejected_not_written():
     assert body is None
     reasons = " ".join(report.rejected)
     assert "no page names this exhibition" in reasons
-    assert "no image" in reasons
+    assert "no freely licensed image" in reasons
     assert "does not mention" in reasons
     assert "official site does not name this museum" in reasons
 
@@ -155,3 +155,15 @@ def test_movement_body_keeps_paragraphs():
     body, _ = bm.build({"movements": SAMPLE["movements"][:1]}, NOW, checks_for_sample())
     assert "\\n\\n" not in body  # real line breaks inside the SQL string, not escapes
     assert "描こうとした動きです。それまで" in body and "\n\nギュスターヴ" in body
+
+
+def test_image_license_and_credit_are_written():
+    class Credited(FakeChecks):
+        def image_credit(self, url):
+            from common.image_info import ImageInfo
+            return ImageInfo(url, "CC BY-SA 4.0", "Photographer Name", "https://commons.wikimedia.org/wiki/File:X.jpg")
+
+    checks = Credited(images={"Impression, Sunrise": "https://upload.wikimedia.org/sunrise.jpg"})
+    body = "\n".join(bm.artwork_statements(SAMPLE["artworks"], checks, bm.Report()))
+    assert "'CC BY-SA 4.0', 'Photographer Name', 'https://commons.wikimedia.org/wiki/File:X.jpg'" in body
+    assert cm.statement_problems(body) == []

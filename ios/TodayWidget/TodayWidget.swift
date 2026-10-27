@@ -6,6 +6,7 @@
 // Info.plist at build time from the app's --dart-define values; nothing is
 // stored in the repository.
 
+import CryptoKit
 import SwiftUI
 import UIKit
 import WidgetKit
@@ -83,17 +84,32 @@ enum ArtLoader {
         return ArtEntry(date: Date(), title: column.title, artist: column.artist, image: await image(column.image_url))
     }
 
-    /// Widgets have little memory: ask Wikimedia for a 500px thumbnail and
-    /// scale it down further before keeping it.
-    private static func image(_ raw: String) async -> UIImage? {
-        let small = raw.replacingOccurrences(
-            of: #"/\d+px-"#, with: "/500px-", options: .regularExpression)
-        guard let url = URL(string: small) else { return nil }
+    /// Our resized copy in Supabase Storage (same name rule as the app and
+    /// scripts/content/mirror_images.py: SHA-1 of the stored image URL).
+    private static func mirrored(_ raw: String) -> URL? {
+        guard let config else { return nil }
+        let hex = Insecure.SHA1.hash(data: Data(raw.utf8)).map { String(format: "%02x", $0) }.joined()
+        return URL(string: "\(config.url)/storage/v1/object/public/art-images/\(hex).jpg")
+    }
+
+    private static func download(_ url: URL) async -> UIImage? {
         var request = URLRequest(url: url, timeoutInterval: 15)
         request.setValue("EnCura/widget (+https://enludus.com; contact@enludus.com)", forHTTPHeaderField: "User-Agent")
         guard let reply = await fetch(request),
-              (reply.response as? HTTPURLResponse)?.statusCode == 200,
-              let image = UIImage(data: reply.data) else { return nil }
+              (reply.response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        return UIImage(data: reply.data)
+    }
+
+    /// Widgets have little memory: take our copy (at most 1280px), else ask
+    /// Wikimedia for a 500px thumbnail, and scale it down further.
+    private static func image(_ raw: String) async -> UIImage? {
+        var found: UIImage?
+        if let copy = mirrored(raw) { found = await download(copy) }
+        if found == nil, let original = URL(string: raw.replacingOccurrences(
+            of: #"/\d+px-"#, with: "/500px-", options: .regularExpression)) {
+            found = await download(original)
+        }
+        guard let image = found else { return nil }
         let side: CGFloat = 600
         let scale = min(1, side / max(image.size.width, image.size.height))
         let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)

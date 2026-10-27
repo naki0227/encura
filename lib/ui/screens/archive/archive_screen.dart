@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:encura/core/models/daily_column.dart';
 import 'package:encura/core/models/trending_article.dart';
 import 'package:encura/core/repositories/daily_column_repository.dart';
 import 'package:encura/core/repositories/trending_repository.dart';
 import 'package:encura/ui/widgets/content_sheets.dart';
-import '../../../core/utils/image_url.dart';
+import '../../widgets/art_image.dart';
 
 class ArchiveScreen extends StatefulWidget {
   final int initialIndex;
@@ -119,7 +118,6 @@ class _ArchiveScreenState extends State<ArchiveScreen> with SingleTickerProvider
     _loadTrendingArticles(refresh: true);
   }
 
-  String _sanitizeUrl(String url) => normalizeImageUrl(url);
 
   void _showColumnDetails(DailyColumn column) => showDailyArt(context, column);
 
@@ -191,14 +189,11 @@ class _ArchiveScreenState extends State<ArchiveScreen> with SingleTickerProvider
               leading: column.imageUrl.isNotEmpty
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(4),
-                      child: CachedNetworkImage(
-                        imageUrl: _sanitizeUrl(column.imageUrl),
-                        httpHeaders: imageHeaders,
+                      child: ArtImage(
+                        column.imageUrl,
                         width: 50,
                         height: 50,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(width: 50, height: 50, color: Colors.grey),
-                        errorWidget: (context, url, error) => Container(width: 50, height: 50, color: Colors.grey),
+                        placeholder: Container(width: 50, height: 50, color: Colors.grey),
                       ),
                     )
                   : Container(width: 50, height: 50, color: Colors.grey),
@@ -236,14 +231,11 @@ class _ArchiveScreenState extends State<ArchiveScreen> with SingleTickerProvider
               leading: article.imageUrl.isNotEmpty
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(4),
-                      child: CachedNetworkImage(
-                        imageUrl: _sanitizeUrl(article.imageUrl),
-                        httpHeaders: imageHeaders,
+                      child: ArtImage(
+                        article.imageUrl,
                         width: 50,
                         height: 50,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(width: 50, height: 50, color: Colors.grey),
-                        errorWidget: (context, url, error) => Container(width: 50, height: 50, color: Colors.grey),
+                        placeholder: Container(width: 50, height: 50, color: Colors.grey),
                       ),
                     )
                   : Container(width: 50, height: 50, color: Colors.grey),

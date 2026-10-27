@@ -12,7 +12,7 @@ class KnowledgeRepository {
         _client.from('movement_links').select('from_slug, to_slug, kind, note'),
         _client
             .from('artworks')
-            .select('id, title, artist, year, movement_slug, collection, image_url, content')
+            .select('id, title, artist, year, movement_slug, collection, image_url, content, image_license, image_credit, image_page')
             .order('year', ascending: true),
       ]);
       return ArtKnowledge(
