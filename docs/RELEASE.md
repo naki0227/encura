@@ -45,6 +45,7 @@ DB への反映・ビルド・TestFlight・点検は、すべて GitHub Actions 
 | Secret | `SUPABASE_ACCESS_TOKEN` | 手順 1 のアクセストークン | DB Migrations（Edge Function のデプロイ）・画像のコピー |
 | Secret | `SUPABASE_PROJECT_REF` | 手順 1 の Project ref | DB Migrations（Edge Function のデプロイ）・画像のコピー |
 | Secret | `SUPABASE_URL` | Project URL | iOS リリース・点検・画像のコピー |
+| Secret | `SUPABASE_SERVICE_ROLE_KEY` | Supabase の秘密キー（手順 6.4） | 画像のコピー |
 | Secret | `SUPABASE_ANON_KEY` | anon キー | iOS リリース・点検 |
 | Secret | `GEMINI_API_KEY` | 手順 2 のキー（点検ではモデル一覧を見るだけで、料金はかかりません） | 点検 |
 | Secret | `ASC_KEY_ID` | App Store Connect API キーの Key ID | iOS リリース |
@@ -90,7 +91,8 @@ DB の鍵は Claude に渡しません。Routine の作成は、手順 1〜4 が
 作品・今日の一枚・ニュースの画像は、Wikimedia Commons と、作品を CC0 で公開している美術館（メトロポリタン美術館、シカゴ美術館、クリーブランド美術館）から取っています。アプリが毎回そこへ取りに行くと、相手のサーバーに止められたときに画像が出なくなるため、縮小したコピーを Supabase Storage のバケット `art-images` に置き、アプリはまずそこから読みます（なければ元の画像を読む）。
 
 - コピーは **Actions → Mirror Images** が作ります。本番 DB の更新のあとと毎日 1 回動き、まだコピーのない画像だけを取りに行きます。手で **Run workflow** してもかまいません。
-- 書き込みに使う service_role キーは、実行のたびに `SUPABASE_ACCESS_TOKEN` で Supabase から読み出し、ログには出しません（リポジトリにも保存しません）。
+- 書き込みには Supabase の秘密キーが要ります。**Supabase の Project Settings → API Keys** で、Secret keys に新しいキー（名前は `github-mirror` など）を作り、GitHub の **Settings → Secrets and variables → Actions** に Secret `SUPABASE_SERVICE_ROLE_KEY` として登録してください（古い形式の service_role キーでもかまいません）。ワークフローはログに出さずに使います。
+- この Secret がないときは `SUPABASE_ACCESS_TOKEN` で読み出そうとしますが、そのトークンに `api_gateway_keys_read` の権限がないと失敗します。
 - 画像ごとにライセンスとクレジットを DB に持ち、クレジットが必要な画像（CC BY / CC BY-SA）は画像の下に表示します。パブリックドメイン・CC0・CC BY・CC BY-SA 以外の画像は載せません。
 
 ## 6.5 画集のリンク（Amazon アソシエイト、任意）
