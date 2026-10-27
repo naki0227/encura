@@ -29,6 +29,7 @@ jobs:
       - name: Build migrations
         run: |
           mkdir -p "$RUNNER_TEMP/out"
+          : > "$RUNNER_TEMP/out/report.md"
           status=0
           for f in $(ls scripts/content/candidates/*.json 2>/dev/null); do
             echo "## $f" | tee -a "$RUNNER_TEMP/out/report.md"
