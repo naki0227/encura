@@ -152,19 +152,81 @@ class ArtworkRow extends StatelessWidget {
   }
 }
 
-/// Body text set for reading; paragraphs come separated by blank lines.
-class ReadingText extends StatelessWidget {
-  const ReadingText(this.text, {super.key});
+/// A work shown large between paragraphs, captioned like a museum label.
+class ArtworkFigure extends StatelessWidget {
+  const ArtworkFigure({super.key, required this.artwork, required this.knowledge});
 
-  final String text;
+  final Artwork artwork;
+  final ArtKnowledge knowledge;
 
   @override
   Widget build(BuildContext context) {
-    final paragraphs = text.split(RegExp(r'\n\s*\n')).where((p) => p.trim().isNotEmpty);
+    final meta = [artwork.artist, if (artwork.year != null) artwork.yearLabel].join('・');
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, bottom: 30),
+      child: Pressable(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ArtworkScreen(artwork: artwork, knowledge: knowledge)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 300,
+              width: double.infinity,
+              color: Palette.frame,
+              padding: const EdgeInsets.all(12),
+              child: KnowledgeImage(artwork.imageUrl, fit: BoxFit.contain),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(artwork.title,
+                          style: const TextStyle(color: Palette.text, fontSize: 14, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text(meta, style: const TextStyle(color: Palette.textSub, fontSize: 12)),
+                    ],
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(top: 2),
+                  child: Text('解説を読む', style: TextStyle(color: Palette.gold, fontSize: 11)),
+                ),
+                const Icon(Icons.chevron_right, size: 18, color: Palette.gold),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Body text set for reading; paragraphs come separated by blank lines.
+///
+/// With [figures], a work goes in after each paragraph but the last, so the
+/// text reads beside the pictures it talks about.
+class ReadingText extends StatelessWidget {
+  const ReadingText(this.text, {super.key, this.figures = const [], this.knowledge});
+
+  final String text;
+  final List<Artwork> figures;
+  final ArtKnowledge? knowledge;
+
+  @override
+  Widget build(BuildContext context) {
+    final paragraphs = text.split(RegExp(r'\n\s*\n')).where((p) => p.trim().isNotEmpty).toList();
+    final k = knowledge;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final p in paragraphs)
+        for (final (i, p) in paragraphs.indexed) ...[
           Padding(
             padding: const EdgeInsets.only(bottom: 18),
             child: Text(
@@ -177,6 +239,9 @@ class ReadingText extends StatelessWidget {
                   ),
             ),
           ),
+          if (k != null && i < figures.length && i < paragraphs.length - 1)
+            ArtworkFigure(artwork: figures[i], knowledge: k),
+        ],
       ],
     );
   }
