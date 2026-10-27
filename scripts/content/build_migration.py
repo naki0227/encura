@@ -126,13 +126,14 @@ class Checks:
         # Offline runs (CI's SQL check) still exercise the location columns.
         return (35.6812, 139.7671) if self.offline else geo.geocode(address)
 
-    def artwork_image(self, titles: list[str], artists: list[str]) -> str | None:
-        """titles/artists: English first, then Japanese."""
+    def artwork_image(self, titles: list[str], artists: list[str], collection: str | None = None) -> str | None:
+        """titles/artists: English first, then Japanese. With the holding
+        museum's name in `collection`, that museum's CC0 image comes first."""
         if self.offline:
             url = "https://upload.wikimedia.org/offline.jpg"
             self._info[url] = ImageInfo(url, "Public domain", "", "")
             return url
-        museum = museums.find(titles[0], artists[0])
+        museum = museums.find(titles[0], artists[0], collection)
         if museum:
             self._info[museum.url] = museum
             return museum.url
@@ -380,7 +381,7 @@ def artwork_statements(items, checks: Checks, report: Report) -> list[str]:
             continue
         seen.add(key)
         title_en, artist_en = clean(item.get("title_en")), clean(item.get("artist_en"))
-        image = checks.artwork_image([title_en, title], [artist_en, artist])
+        image = checks.artwork_image([title_en, title], [artist_en, artist], clean(item.get("collection")))
         if not image:
             report.no("artwork", label, "no freely licensed image of this work by this artist (museums, Wikidata)")
             continue

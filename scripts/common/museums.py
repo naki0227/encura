@@ -3,8 +3,9 @@
 The Metropolitan Museum of Art, the Art Institute of Chicago and the
 Cleveland Museum of Art offer public-domain works with open APIs and no key.
 Their images are sharper than most Commons copies and their license is plain,
-so the content build looks here before Wikidata. A hit must name the same
-artist, and a title that matches the one asked for.
+so the content build looks here before Wikidata when one of them holds the
+work. A hit must name the same artist, and a title that matches the one
+asked for.
 """
 from __future__ import annotations
 
@@ -91,16 +92,35 @@ def cleveland(title: str, artist: str, http: requests.Session) -> ImageInfo | No
     return None
 
 
-def find(title_en: str, artist_en: str, session: requests.Session | None = None) -> ImageInfo | None:
-    """The first museum with this work as CC0, or None (also on network trouble)."""
-    if not title_en or not artist_en:
-        return None
-    http = session or requests.Session()
-    for source in (met, aic, cleveland):
-        try:
-            found = source(title_en, artist_en, http)
-        except (requests.RequestException, ValueError):
-            continue
-        if found:
-            return found
+# Each museum, by the names a collection field uses for it.
+_BY_COLLECTION = (
+    (("metropolitan", "メトロポリタン"), met),
+    (("art institute of chicago", "シカゴ美術館"), aic),
+    (("cleveland", "クリーブランド"), cleveland),
+)
+
+
+def museum_for(collection: str | None):
+    text = (collection or "").lower()
+    for names, source in _BY_COLLECTION:
+        if any(n in text for n in names):
+            return source
     return None
+
+
+def find(title_en: str, artist_en: str, collection: str | None,
+         session: requests.Session | None = None) -> ImageInfo | None:
+    """The work's image from the museum that holds it, when that museum
+    publishes it as CC0; None otherwise (also on network trouble).
+
+    Only the holding museum is asked: other museums often have another
+    version of the same subject (a print, a study, another painting in a
+    series), which must not stand in for the work described.
+    """
+    source = museum_for(collection)
+    if not source or not title_en or not artist_en:
+        return None
+    try:
+        return source(title_en, artist_en, session or requests.Session())
+    except (requests.RequestException, ValueError):
+        return None

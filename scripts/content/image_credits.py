@@ -32,9 +32,6 @@ from common import museums  # noqa: E402
 from common.image_info import ImageInfo, commons_info, is_allowed  # noqa: E402
 from content import sql  # noqa: E402
 
-MUSEUMS = ("metropolitan", "メトロポリタン", "art institute of chicago", "シカゴ美術館", "cleveland", "クリーブランド")
-
-
 def rows(table: str, columns: str) -> list[dict]:
     url = os.environ["SUPABASE_URL"].rstrip("/") + f"/rest/v1/{table}"
     key = os.environ["SUPABASE_ANON_KEY"]
@@ -71,11 +68,9 @@ def main() -> int:
         if not url:
             continue
         label = f"{art['title']} / {art['artist']}"
-        info = None
-        if any(m in (art.get("collection") or "").lower() for m in MUSEUMS):
-            info = museums.find(art.get("title_en") or "", art.get("artist_en") or "")
-            if info:
-                report.append(f"- artwork: {label} — museum image ({info.credit})")
+        info = museums.find(art.get("title_en") or "", art.get("artist_en") or "", art.get("collection"))
+        if info:
+            report.append(f"- artwork: {label} — museum image ({info.credit})")
         if not info:
             info = describe(url)
             if info:

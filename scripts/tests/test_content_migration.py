@@ -22,7 +22,7 @@ class FakeChecks(bm.Checks):
     def geocode(self, address):
         return self.coords
 
-    def artwork_image(self, titles, artists):
+    def artwork_image(self, titles, artists, collection=None):
         return next((self.images[t] for t in titles if t in self.images), None)
 
 

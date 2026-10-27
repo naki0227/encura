@@ -26,3 +26,10 @@ def test_museum_hits_must_match_artist_and_title():
     assert museums.title_matches("Bridge over a Pond of Water Lilies", "Bridge over a Pond of Water Lilies")
     assert museums.title_matches("The Card Players", "The Card Players")
     assert not museums.title_matches("The Card Players", "Still Life with Apples")
+
+
+def test_only_the_holding_museum_is_asked():
+    assert museums.museum_for("メトロポリタン美術館") is museums.met
+    assert museums.museum_for("The Art Institute of Chicago") is museums.aic
+    assert museums.museum_for("ルーヴル美術館") is None
+    assert museums.find("Mona Lisa", "Leonardo da Vinci", "ルーヴル美術館") is None
