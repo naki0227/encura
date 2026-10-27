@@ -81,7 +81,8 @@ class MovementScreen extends StatelessWidget {
                   const SizedBox(height: 20),
                   const Divider(height: 1, color: Palette.line),
                   const SizedBox(height: 20),
-                  ReadingText(movement.body),
+                  // The cover is the first work; the next ones sit between paragraphs.
+                  ReadingText(movement.body, figures: works.skip(1).toList(), knowledge: knowledge),
                   SourceLink(movement.sourceUrl),
                 ],
               ),
@@ -105,7 +106,7 @@ class MovementScreen extends StatelessWidget {
               ),
             ),
           SliverToBoxAdapter(
-            child: ArtworkRow(label: 'Works', title: '代表作', works: works, knowledge: knowledge),
+            child: ArtworkRow(label: 'Works', title: 'この流れの作品', works: works, knowledge: knowledge),
           ),
           SliverToBoxAdapter(
             child: Padding(
@@ -133,6 +134,7 @@ class _LinkCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final target = other;
     if (target == null) return const SizedBox.shrink();
+    final cover = knowledge.coverOf(target.slug);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Pressable(
@@ -141,31 +143,46 @@ class _LinkCard extends StatelessWidget {
           MaterialPageRoute(builder: (_) => MovementScreen(movement: target, knowledge: knowledge)),
         ),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: Palette.frame,
             borderRadius: BorderRadius.circular(4),
             border: Border.all(color: Palette.line),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(incoming ? Icons.arrow_back : Icons.arrow_forward, size: 14, color: Palette.gold),
-                  const SizedBox(width: 6),
-                  Text(
-                    incoming ? '${target.nameJa}から' : '${target.nameJa}へ',
-                    style: const TextStyle(color: Palette.text, fontSize: 14, fontWeight: FontWeight.w700),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (cover.isNotEmpty) SizedBox(width: 88, child: KnowledgeImage(cover)),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(incoming ? Icons.arrow_back : Icons.arrow_forward, size: 14, color: Palette.gold),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                incoming ? '${target.nameJa}から' : '${target.nameJa}へ',
+                                style: const TextStyle(color: Palette.text, fontSize: 14, fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                            Text(link.kindLabel,
+                                style: const TextStyle(
+                                    color: Palette.gold, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(link.note, style: const TextStyle(color: Palette.textSub, fontSize: 13, height: 1.8)),
+                      ],
+                    ),
                   ),
-                  const Spacer(),
-                  Text(link.kindLabel,
-                      style: const TextStyle(color: Palette.gold, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(link.note, style: const TextStyle(color: Palette.textSub, fontSize: 13, height: 1.8)),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -244,8 +244,7 @@ class _TimelineItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cover = knowledge.coverOf(movement.slug);
-    final count = knowledge.worksOf(movement.slug).length;
+    final works = knowledge.worksOf(movement.slug);
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -284,37 +283,51 @@ class _TimelineItem extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                     border: Border.all(color: Palette.line),
                   ),
-                  child: Row(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                      // Up to three works side by side, like a wall in the room.
+                      if (works.isNotEmpty)
+                        SizedBox(
+                          height: 128,
+                          child: Row(
                             children: [
-                              Text('${movement.regionLabel}・${movement.period}',
-                                  style: const TextStyle(color: Palette.textSub, fontSize: 11, letterSpacing: 0.5)),
-                              const SizedBox(height: 6),
-                              Text(movement.nameJa,
-                                  style: const TextStyle(color: Palette.text, fontSize: 16, fontWeight: FontWeight.w700)),
-                              const SizedBox(height: 6),
-                              Text(
-                                movement.summary,
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Palette.textSub, fontSize: 12, height: 1.7),
-                              ),
-                              if (count > 0) ...[
-                                const SizedBox(height: 8),
-                                Text('作品 $count点',
-                                    style: const TextStyle(color: Palette.gold, fontSize: 11, fontWeight: FontWeight.w700)),
+                              for (final (i, a) in works.take(3).indexed) ...[
+                                if (i > 0) const SizedBox(width: 2),
+                                Expanded(child: SizedBox.expand(child: KnowledgeImage(a.imageUrl))),
                               ],
                             ],
                           ),
                         ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${movement.regionLabel}・${movement.period}',
+                                style: const TextStyle(color: Palette.textSub, fontSize: 11, letterSpacing: 0.5)),
+                            const SizedBox(height: 6),
+                            Text(movement.nameJa,
+                                style: const TextStyle(color: Palette.text, fontSize: 16, fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 6),
+                            Text(
+                              movement.summary,
+                              maxLines: works.isEmpty ? 3 : 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Palette.textSub, fontSize: 12, height: 1.7),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              works.isEmpty ? '作品は文章で紹介しています（著作権保護期間中）' : '作品 ${works.length}点を見る',
+                              style: TextStyle(
+                                color: works.isEmpty ? Palette.textSub : Palette.gold,
+                                fontSize: 11,
+                                fontWeight: works.isEmpty ? FontWeight.normal : FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      if (cover.isNotEmpty) SizedBox(width: 84, child: KnowledgeImage(cover)),
                     ],
                   ),
                 ),
