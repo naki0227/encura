@@ -16,6 +16,7 @@ saves them as JSON; this script decides what is publishable:
   * movement links (how movements connect): both movements must exist
   * artworks (the public-domain library): like Today's Art, the artwork must
     have an image on Wikidata/Commons credited to the same artist
+  * artists: the source page must name the artist
 
 Accepted items become supabase/migrations/<UTC timestamp>_content_<JST date>.sql.
 The SQL is idempotent (ON CONFLICT ...), so re-running a day is harmless.
@@ -370,6 +371,49 @@ on conflict (title, artist) do update set
     return out
 
 
+def artist_statements(items, checks: Checks, report: Report) -> list[str]:
+    out = []
+    for item in items or []:
+        name, name_en = clean(item.get("name")), clean(item.get("name_en"))
+        short = clean(item.get("short_name"))
+        region = clean(item.get("region"))
+        born, died = parse_year(item.get("born")), parse_year(item.get("died"))
+        summary, body = clean(item.get("summary")), paragraphs(item.get("body"))
+        slugs = [clean(m) for m in item.get("movements") or []]
+        label = name or "?"
+        if not name or not name_en or region not in REGIONS or not all(SLUG.match(m) for m in slugs):
+            report.no("artist", label, "missing name, English name or region, or bad movement slug")
+            continue
+        if born is not None and died is not None and died < born:
+            report.no("artist", label, "died before born")
+            continue
+        if not summary or len(body) < 150:
+            report.no("artist", label, "missing summary or body (150+ characters)")
+            continue
+        verified = checks.page_naming(name, [clean(item.get("source_url"))])
+        if not verified:
+            report.no("artist", label, "source page does not name this artist")
+            continue
+        movements = "array[" + ", ".join(sql.text(m) for m in slugs) + "]::text[]"
+        out.append(f"""insert into public.artists (name, name_en, short_name, born, died, region, movement_slugs, summary, body, source_url)
+values ({sql.text(name)}, {sql.text(name_en)}, {sql.text(short or None)},
+        {"null" if born is None else born}, {"null" if died is None else died}, {sql.text(region)}, {movements},
+        {sql.text(summary)}, {sql.text(body)}, {sql.text(verified)})
+on conflict (name) do update set
+    name_en = excluded.name_en,
+    short_name = excluded.short_name,
+    born = excluded.born,
+    died = excluded.died,
+    region = excluded.region,
+    movement_slugs = excluded.movement_slugs,
+    summary = excluded.summary,
+    body = excluded.body,
+    source_url = excluded.source_url,
+    updated_at = now();""")
+        report.ok("artist", label, verified)
+    return out
+
+
 def build(candidates: dict, now: dt.datetime, checks: Checks) -> tuple[str | None, Report]:
     report = Report()
     today = now.astimezone(JST).date()
@@ -381,6 +425,7 @@ def build(candidates: dict, now: dt.datetime, checks: Checks) -> tuple[str | Non
         + movement_statements(candidates.get("movements"), checks, report)
         + link_statements(candidates.get("movement_links"), report)
         + artwork_statements(candidates.get("artworks"), checks, report)
+        + artist_statements(candidates.get("artists"), checks, report)
     )
     if not statements:
         return None, report

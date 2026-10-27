@@ -98,13 +98,64 @@ class Artwork {
   String get yearLabel => year == null ? '' : '$year年';
 }
 
+class Artist {
+  final String name;
+  final String nameEn;
+  final String? shortName;
+  final int? born;
+  final int? died;
+  final String region;
+  final List<String> movementSlugs;
+  final String summary;
+  final String body;
+  final String sourceUrl;
+
+  const Artist({
+    required this.name,
+    required this.nameEn,
+    required this.shortName,
+    required this.born,
+    required this.died,
+    required this.region,
+    required this.movementSlugs,
+    required this.summary,
+    required this.body,
+    required this.sourceUrl,
+  });
+
+  factory Artist.fromJson(Map<String, dynamic> json) => Artist(
+        name: json['name'],
+        nameEn: json['name_en'] ?? '',
+        shortName: json['short_name'],
+        born: json['born'],
+        died: json['died'],
+        region: json['region'] ?? '',
+        movementSlugs: [for (final s in (json['movement_slugs'] as List?) ?? const []) s as String],
+        summary: json['summary'] ?? '',
+        body: json['body'] ?? '',
+        sourceUrl: json['source_url'] ?? '',
+      );
+
+  /// "1840–1926" / "1881–" / "".
+  String get lifeLabel {
+    if (born == null && died == null) return '';
+    return '${born ?? '?'}–${died ?? ''}';
+  }
+
+  String get regionLabel => Movement.regionLabels[region] ?? region;
+}
+
 /// Everything the Learn tab shows, loaded once (a few hundred rows at most).
 class ArtKnowledge {
   final List<Movement> movements;
   final List<MovementLink> links;
   final List<Artwork> artworks;
 
-  ArtKnowledge({required this.movements, required this.links, required this.artworks});
+  /// Artists with a written profile. Artists who only appear on artworks
+  /// still have a page, built from their works.
+  final List<Artist> artists;
+
+  ArtKnowledge({required this.movements, required this.links, required this.artworks, this.artists = const []});
 
   static final empty = ArtKnowledge(movements: const [], links: const [], artworks: const []);
 
@@ -137,5 +188,89 @@ class ArtKnowledge {
   String coverOf(String slug) {
     final works = worksOf(slug);
     return works.isEmpty ? '' : works.first.imageUrl;
+  }
+
+  Artist? artist(String name) {
+    for (final a in artists) {
+      if (a.name == name) return a;
+    }
+    return null;
+  }
+
+  /// Every artist the app knows, from profiles and from artworks, in order
+  /// of when they were active.
+  late final List<String> artistNames = {for (final a in artworks) a.artist, for (final a in artists) a.name}.toList()
+    ..sort((a, b) => (activeFrom(a) ?? 99999).compareTo(activeFrom(b) ?? 99999));
+
+  /// The birth year, or the year of the earliest dated work.
+  int? activeFrom(String name) {
+    final born = artist(name)?.born;
+    if (born != null) return born;
+    final years = [for (final a in artworks) if (a.artist == name && a.year != null) a.year!];
+    return years.isEmpty ? null : years.reduce((a, b) => a < b ? a : b);
+  }
+
+  /// The death year, or the year of the latest dated work.
+  int? activeTo(String name) {
+    final profile = artist(name);
+    if (profile != null && (profile.died != null || profile.born != null)) return profile.died;
+    final years = [for (final a in artworks) if (a.artist == name && a.year != null) a.year!];
+    return years.isEmpty ? null : years.reduce((a, b) => a > b ? a : b);
+  }
+
+  /// Where the artist worked: from the profile, else from their works' movements.
+  String? regionOf(String name) {
+    final profile = artist(name);
+    if (profile != null) return profile.region;
+    for (final m in movementsOf(name)) {
+      return m.region;
+    }
+    return null;
+  }
+
+  /// A picture for the artist: their earliest dated work.
+  String coverOfArtist(String name) {
+    final works = byArtist(name)..sort((a, b) => (a.year ?? 99999).compareTo(b.year ?? 99999));
+    return works.isEmpty ? '' : works.first.imageUrl;
+  }
+
+  /// Movements the artist belongs to, in time order.
+  List<Movement> movementsOf(String name) {
+    final slugs = {
+      for (final a in artworks)
+        if (a.artist == name && a.movementSlug != null) a.movementSlug!,
+      ...?artist(name)?.movementSlugs,
+    };
+    return movements.where((m) => slugs.contains(m.slug)).toList();
+  }
+
+  /// Artists of a movement, in order of when they were active.
+  List<String> artistsOf(String slug) =>
+      artistNames.where((name) => movementsOf(name).any((m) => m.slug == slug)).toList();
+
+  /// Artists alive or at work at the same time, nearest first.
+  List<String> contemporaries(String name, {int limit = 12}) {
+    final from = activeFrom(name);
+    if (from == null) return const [];
+    final to = activeTo(name) ?? from + 60;
+    final others = <String, int>{};
+    for (final other in artistNames) {
+      if (other == name) continue;
+      final f = activeFrom(other);
+      if (f == null) continue;
+      final t = activeTo(other) ?? f + 60;
+      if (f <= to && t >= from) others[other] = (f - from).abs();
+    }
+    final sorted = others.keys.toList()..sort((a, b) => others[a]!.compareTo(others[b]!));
+    return sorted.take(limit).toList();
+  }
+
+  /// Movements in other regions that overlap this one in time.
+  List<Movement> concurrent(Movement movement) {
+    final end = movement.endYear ?? DateTime.now().year;
+    return movements
+        .where((m) =>
+            m.region != movement.region && m.startYear <= end && (m.endYear ?? DateTime.now().year) >= movement.startYear)
+        .toList();
   }
 }

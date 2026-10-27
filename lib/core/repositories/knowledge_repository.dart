@@ -19,10 +19,22 @@ class KnowledgeRepository {
         movements: (results[0] as List).map((e) => Movement.fromJson(e)).toList(),
         links: (results[1] as List).map((e) => MovementLink.fromJson(e)).toList(),
         artworks: (results[2] as List).map((e) => Artwork.fromJson(e)).toList(),
+        artists: await _artists(),
       );
     } catch (e) {
       // debugPrint('Error loading art knowledge: $e');
       return ArtKnowledge.empty;
+    }
+  }
+
+  /// Artist profiles came later than the rest; without them the Learn tab
+  /// still works, building artist pages from the artworks alone.
+  Future<List<Artist>> _artists() async {
+    try {
+      final rows = await _client.from('artists').select().order('born', ascending: true);
+      return (rows as List).map((e) => Artist.fromJson(e)).toList();
+    } catch (e) {
+      return const [];
     }
   }
 }

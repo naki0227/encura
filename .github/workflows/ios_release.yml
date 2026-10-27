@@ -59,10 +59,15 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          # Optional, not secret (it is in every link): Settings → Secrets and
+          # variables → Actions → Variables. Empty hides the art book links.
+          AMAZON_ASSOCIATE_TAG: ${{ vars.AMAZON_ASSOCIATE_TAG }}
         run: |
           python3 - <<'PY'
           import base64, binascii, json, os, sys
           config = {k: os.environ[k] for k in ("SUPABASE_URL", "SUPABASE_ANON_KEY")}
+          if os.environ.get("AMAZON_ASSOCIATE_TAG", "").strip():
+              config["AMAZON_ASSOCIATE_TAG"] = os.environ["AMAZON_ASSOCIATE_TAG"].strip()
           path = os.path.join(os.environ["RUNNER_TEMP"], "prod.json")
           with open(path, "w") as f:
               json.dump(config, f)

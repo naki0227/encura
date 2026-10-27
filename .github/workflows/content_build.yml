@@ -1,0 +1,43 @@
+name: Content Build
+
+# Builds content migrations on a GitHub runner, for when the machine that
+# researched the candidates cannot reach Wikidata/Commons itself (they rate-
+# limit some cloud addresses). Push candidate JSON files to a branch named
+# claude/candidates-* under scripts/content/candidates/; the generated
+# migration(s) and the Accepted/Rejected report come back as an artifact.
+# Commit the migration on a claude/content-* branch as usual (see
+# docs/CONTENT_ROUTINE.md); the candidates branch itself is never merged.
+on:
+  push:
+    branches: [ 'claude/candidates-*' ]
+    paths: [ 'scripts/content/candidates/**' ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r scripts/requirements.txt
+      - name: Build migrations
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          status=0
+          for f in scripts/content/candidates/*.json; do
+            echo "## $f" | tee -a "$RUNNER_TEMP/out/report.md"
+            python scripts/content/build_migration.py "$f" --out-dir "$RUNNER_TEMP/out" \
+              | tee -a "$RUNNER_TEMP/out/report.md" || status=$?
+            # One migration per file: the name carries the second it was written.
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/out/report.md" >> "$GITHUB_STEP_SUMMARY"
+          ls "$RUNNER_TEMP/out"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: content-migrations
+          path: ${{ runner.temp }}/out

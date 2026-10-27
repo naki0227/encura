@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/models/art_knowledge.dart';
 import '../../../core/services/favorites_store.dart';
+import '../../../core/utils/exhibition_match.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/motion.dart';
 import 'learn_widgets.dart';
@@ -41,7 +42,8 @@ class ArtworkScreen extends StatelessWidget {
     final sameMovement = movement == null
         ? <Artwork>[]
         : knowledge.worksOf(movement.slug).where((a) => a.id != artwork.id && a.artist != artwork.artist).toList();
-    final meta = [artwork.artist, if (artwork.year != null) artwork.yearLabel].join('・');
+    final profile = knowledge.artist(artwork.artist);
+    final callName = profile?.shortName ?? artwork.artist;
 
     return Scaffold(
       appBar: AppBar(
@@ -80,11 +82,26 @@ class ArtworkScreen extends StatelessWidget {
                         height: 1.5,
                       ),
                 ),
-                const SizedBox(height: 6),
-                Text(meta, style: const TextStyle(color: Palette.textSub, fontSize: 14, letterSpacing: 1)),
+                const SizedBox(height: 8),
+                Pressable(
+                  onTap: () => openArtist(context, artwork.artist, knowledge),
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          [artwork.artist, if (artwork.year != null) artwork.yearLabel].join('・'),
+                          style: const TextStyle(color: Palette.text, fontSize: 14, letterSpacing: 1),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text('画家のページ', style: TextStyle(color: Palette.gold, fontSize: 11)),
+                      const Icon(Icons.chevron_right, size: 16, color: Palette.gold),
+                    ],
+                  ),
+                ),
                 if ((artwork.collection ?? '').isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text('所蔵：${artwork.collection}', style: const TextStyle(color: Palette.textSub, fontSize: 12)),
+                  const SizedBox(height: 8),
+                  CollectionLink(artwork.collection!),
                 ],
                 if (movement != null) ...[
                   const SizedBox(height: 16),
@@ -116,8 +133,13 @@ class ArtworkScreen extends StatelessWidget {
                 const SizedBox(height: 20),
                 ReadingText(artwork.content),
                 AskCuratorButton(question: '${artwork.artist}の「${artwork.title}」について、見どころと時代背景をもっと教えてください。'),
+                BookLink(query: '$callName 画集', label: '$callNameの画集を探す'),
               ],
             ),
+          ),
+          ExhibitionsSection(
+            keys: [if (artwork.title.length >= 3) artwork.title, ...artistKeys(artwork.artist, profile)],
+            title: 'この作品・画家に会える展覧会',
           ),
           ArtworkRow(label: 'Same artist', title: '${artwork.artist}の作品', works: sameArtist, knowledge: knowledge),
           if (movement != null)

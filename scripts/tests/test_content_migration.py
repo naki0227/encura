@@ -33,6 +33,7 @@ def checks_for_sample():
             "https://example.com/article": "出典に載っている固有名詞",
             "https://ja.wikipedia.org/wiki/写実主義": "写実主義",
             "https://ja.wikipedia.org/wiki/印象派": "印象派",
+            "https://ja.wikipedia.org/wiki/クロード・モネ": "クロード・モネ",
         },
         images={
             "The Starry Night": "https://upload.wikimedia.org/starry.jpg",
@@ -45,7 +46,7 @@ def checks_for_sample():
 def test_sample_produces_a_migration_that_passes_the_gate(tmp_path):
     body, report = bm.build(SAMPLE, NOW, checks_for_sample())
     assert body.startswith(bm.GENERATED_MARK)
-    assert len(report.accepted) == 8 and not report.rejected
+    assert len(report.accepted) == 9 and not report.rejected
     assert "POINT(139.775543 35.717556)" in body
     assert cm.statement_problems(body) == []
 
@@ -115,7 +116,8 @@ def test_published_reads_items_back(tmp_path):
     assert ("exhibition", "特別展「例示の美術」 @ 東京国立博物館") in items
     assert ("daily art", "星月夜 / フィンセント・ファン・ゴッホ") in items
     assert ("artwork", "印象・日の出 / クロード・モネ") in items
-    assert len(items) == 8
+    assert ("artist", "クロード・モネ") in items
+    assert len(items) == 9
 
 
 def test_venue_needs_geocodable_address():
@@ -139,7 +141,14 @@ def test_art_knowledge_rows_are_checked():
     assert bm.link_statements(links, report) == []
     artworks = [dict(SAMPLE["artworks"][0], title_en="Unknown work", title="不明の作品")]
     assert bm.artwork_statements(artworks, checks_for_sample(), report) == []
-    assert len(report.rejected) == 6 and not report.accepted
+    artists = [
+        dict(SAMPLE["artists"][0], region="moon"),
+        dict(SAMPLE["artists"][0], born=1926, died=1840),
+        dict(SAMPLE["artists"][0], body="短い"),
+        dict(SAMPLE["artists"][0], source_url="https://example.com/unrelated"),
+    ]
+    assert bm.artist_statements(artists, checks_for_sample(), report) == []
+    assert len(report.rejected) == 10 and not report.accepted
 
 
 def test_movement_body_keeps_paragraphs():
