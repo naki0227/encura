@@ -76,7 +76,7 @@ class _ArtistsScreenState extends State<ArtistsScreen> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Text('${names.length}人・生まれた順', style: const TextStyle(color: Palette.textSub, fontSize: 12)),
+              child: Text('${names.length}人・時代順', style: const TextStyle(color: Palette.textSub, fontSize: 12)),
             ),
           ),
           SliverPadding(

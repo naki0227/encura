@@ -55,7 +55,13 @@ Web 検索で調べ、**自分で公式ページを開いて確かめたもの�
   - `content` は 200〜300 字。背景と見どころに加えて、流れの中での位置（何を受け継ぎ、何を変えたか）にひとこと触れる。
 - **流派（movements）: 足りない流派や、書き直したほうがよい流派があるときだけ。** 本文は 500〜800 字、空行で段落を分け、①背景 ②何が変わったか ③見どころ を入れる。`source_url` は `name_ja` が載っている日本語版ウィキペディアか美術館のページ。同じ `slug` で出すと上書きされる。
 - **つながり（movement_links）:** `kind` は `led_to`（自然に次が生まれた）／`reaction`（反発して生まれた）／`influence`（時代・地域をこえた影響）。`note` は 40〜80 字で、誰が何を受け継いだか・反発したかを具体的に。
-- 形式の細かい決まりは `scripts/content/sample_candidates.json` の `movements` / `movement_links` / `artworks` を見る。
+- **作品は画家ごとにも見られる**ので、作品の少ない有名な画家（`published.py --kind artwork` で 1〜2 点しかない画家）の代表作も優先して足す。
+- **画家（artists）: 1 回に 3 人まで。** `published.py --kind artist` に載っていない画家を足す。作品が載っている画家を優先し、作品を載せられない近現代の画家（ピカソ、デュシャン、具体の作家など）も、流派の本文に出てくる人なら入れてよい。存命の作家は入れない。
+  - `name` は作品の `artist` と同じ表記（アプリはこの名前で作品とつなぐ）。`short_name` は展覧会名でよく使われる呼び方（「モネ」「北斎」）。展覧会とのつながりに使う。
+  - `born` / `died` は西暦（分からなければ `null`）。`movements` は所属した流れの slug の配列。
+  - `summary` は 1 文、`body` は 300〜600 字で空行で段落を分け、①生い立ちと学んだこと ②何を描き、何を変えたか ③代表作や後への影響 を入れる。生年・没年・代表作などの事実は調べて確かめる。
+  - `source_url` は `name` がそのまま載っている日本語版ウィキペディアのページ（表記が違うページだと通らない）。
+- 形式の細かい決まりは `scripts/content/sample_candidates.json` の `movements` / `movement_links` / `artworks` / `artists` を見る。
 
 ### 季節の特集（news に `keyword: "特集"` で入れる）
 毎年恒例の展覧会は、**その年の会期が公式に発表されていれば** 特集記事にします。未発表なら書きません。
@@ -81,6 +87,7 @@ python scripts/content/build_migration.py /path/to/candidates.json
 - 出力の「Accepted」「Rejected」を読む。Rejected が多いときは、出典 URL や英語名を直して一度だけやり直してよい。
 - 何も通らなかった（終了コード 1）ときは、PR を出さずに終える。
 - 作られたファイルは手で編集しない（CI が「スクリプトが作ったもの」であることを確かめます）。
+- 手元から Wikidata・Wikimedia Commons に届かない（HTTP 429 が続く）ときは、候補の JSON をブランチ `claude/candidates-<日付>` の `scripts/content/candidates/` に push する。GitHub Actions（`.github/workflows/content_build.yml`）が同じスクリプトで確かめ、作ったマイグレーションと Accepted / Rejected を成果物（artifact）として返すので、それを `claude/content-<日付>` にコミットして手順 3 に進む。候補のブランチはマージしない。
 
 ## 3. PR を出す
 

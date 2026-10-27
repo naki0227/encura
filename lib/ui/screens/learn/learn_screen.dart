@@ -483,8 +483,10 @@ class _FeaturedArtists extends StatelessWidget {
     for (final a in knowledge.artworks) {
       counts[a.artist] = (counts[a.artist] ?? 0) + 1;
     }
-    // Most works first; among equals, keep the order of when they were active.
-    final names = [...knowledge.artistNames]..sort((a, b) => (counts[b] ?? 0).compareTo(counts[a] ?? 0));
+    // Artists with a written profile and many works first; among equals,
+    // keep the order of when they were active.
+    int score(String name) => (counts[name] ?? 0) + (knowledge.artist(name) != null ? 2 : 0);
+    final names = [...knowledge.artistNames]..sort((a, b) => score(b).compareTo(score(a)));
     return ArtistRow(
       label: 'Artists',
       title: '画家から見る',
