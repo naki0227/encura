@@ -53,6 +53,7 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
         run: |
+          set -o pipefail
           python scripts/ios/appstore_submit.py --version "${{ inputs.version }}" --build "${{ inputs.build }}" \
             ${{ inputs.submit && '--submit' || '' }} | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Remove the key

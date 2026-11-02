@@ -75,6 +75,10 @@ def release_notes(version: str) -> str:
     if not match:
         raise SystemExit(f"no release notes for {version} in {RELEASE_DOC}")
     notes = match.group(1).strip()
+    # App Store Connect refuses symbols such as ♡ and emoji in "What's New".
+    bad = sorted({c for c in notes if ord(c) > 0xFFFF or 0x2600 <= ord(c) <= 0x27BF})
+    if bad:
+        raise SystemExit(f"release notes contain characters App Store Connect refuses: {' '.join(bad)}")
     if len(notes) > 4000:
         raise SystemExit("release notes are longer than 4000 characters")
     return notes
