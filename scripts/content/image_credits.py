@@ -3,8 +3,8 @@
 
 Reads the published rows through the public REST API, then for each image:
 
-  * artworks held by a museum that publishes CC0 images (the Met, the Art
-    Institute of Chicago, the Cleveland Museum of Art) switch to the museum's
+  * artworks held by a museum that publishes CC0 images (the Met, the
+    Cleveland Museum of Art) switch to the museum's
     image when the museum names the same work by the same artist;
   * Commons images get their license and credit from the file page;
   * images whose license is unknown or not allowed (not public domain, CC0,

@@ -119,7 +119,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leading: Icon(Icons.image_outlined),
             title: Text('作品画像について'),
             subtitle: Text(
-              '作品画像は、Wikimedia Commons と、作品を自由に使えるよう公開している美術館（メトロポリタン美術館、シカゴ美術館、クリーブランド美術館）のものです。著作権の切れた作品だけを載せ、クレジットが必要な画像には画像の下に表示しています。',
+              '作品画像は、Wikimedia Commons と、作品を自由に使えるよう公開している美術館（メトロポリタン美術館、クリーブランド美術館）のものです。著作権の切れた作品だけを載せ、クレジットが必要な画像には画像の下に表示しています。',
             ),
           ),
           if (AppConfig.amazonAssociateTag.isNotEmpty) ...[

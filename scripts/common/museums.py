@@ -1,7 +1,9 @@
 """Artwork images from museums that publish their collections as CC0.
 
-The Metropolitan Museum of Art, the Art Institute of Chicago and the
-Cleveland Museum of Art offer public-domain works with open APIs and no key.
+The Metropolitan Museum of Art and the Cleveland Museum of Art offer
+public-domain works with open APIs and no key. (The Art Institute of
+Chicago does too, but its image server refuses the mirror workflow's
+downloads, so its images are not used.)
 Their images are sharper than most Commons copies and their license is plain,
 so the content build looks here before Wikidata when one of them holds the
 work. A hit must name the same artist, and a title that matches the one
@@ -66,19 +68,6 @@ def met(title: str, artist: str, http: requests.Session) -> ImageInfo | None:
     return None
 
 
-def aic(title: str, artist: str, http: requests.Session) -> ImageInfo | None:
-    data = _get(http, "https://api.artic.edu/api/v1/artworks/search", {
-        "q": title, "limit": "8", "fields": "id,title,artist_title,image_id,is_public_domain",
-    })
-    for hit in data.get("data") or []:
-        if (hit.get("is_public_domain") and hit.get("image_id")
-                and artist_matches(artist, hit.get("artist_title") or "") and title_matches(title, hit.get("title", ""))):
-            return ImageInfo(url=f"https://www.artic.edu/iiif/2/{hit['image_id']}/full/843,/0/default.jpg",
-                             license="CC0", credit="The Art Institute of Chicago",
-                             page=f"https://www.artic.edu/artworks/{hit['id']}")
-    return None
-
-
 def cleveland(title: str, artist: str, http: requests.Session) -> ImageInfo | None:
     data = _get(http, "https://openaccess-api.clevelandart.org/api/artworks/", {
         "q": title, "has_image": "1", "cc0": "1", "limit": "8",
@@ -95,7 +84,6 @@ def cleveland(title: str, artist: str, http: requests.Session) -> ImageInfo | No
 # Each museum, by the names a collection field uses for it.
 _BY_COLLECTION = (
     (("metropolitan", "メトロポリタン"), met),
-    (("art institute of chicago", "シカゴ美術館"), aic),
     (("cleveland", "クリーブランド"), cleveland),
 )
 

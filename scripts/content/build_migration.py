@@ -7,8 +7,8 @@ saves them as JSON; this script decides what is publishable:
   * exhibitions: the official page must name the exhibition; the venue is
     geocoded from its address with the GSI address search
   * Today's Art: the artwork must have an image credited to the same artist,
-    from a museum that publishes it as CC0 (the Met, the Art Institute of
-    Chicago, the Cleveland Museum of Art) or else from Wikidata/Commons; the
+    from a museum that publishes it as CC0 (the Met, the Cleveland Museum
+    of Art) or else from Wikidata/Commons; the
     image's license must be public domain, CC0, CC BY or CC BY-SA, and its
     license and credit are stored with the row
   * news: the source page must name the subject of the story
