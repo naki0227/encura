@@ -1,0 +1,60 @@
+name: App Store Submit
+
+# Prepares an App Store version from a TestFlight build and submits it for
+# review (scripts/ios/appstore_submit.py). Without "submit" it only prints
+# what it would change.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version shown on the App Store (e.g. 1.0.5)'
+        required: true
+      build:
+        description: 'Build number checked in TestFlight (e.g. 17)'
+        required: true
+      submit:
+        description: 'Make the changes and submit for review (off = dry run)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install "pyjwt[crypto]>=2.8,<3" "requests>=2.32,<3"
+      - name: Write the API key
+        env:
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+        run: |
+          python3 - <<'PY'
+          import base64, binascii, os, sys
+          key = os.environ["ASC_KEY_P8_BASE64"].strip()
+          if "BEGIN PRIVATE KEY" not in key:
+              try:
+                  key = base64.b64decode("".join(key.split()), validate=True).decode().strip()
+              except (binascii.Error, UnicodeDecodeError):
+                  key = ""
+          if not key.startswith("-----BEGIN PRIVATE KEY-----"):
+              print("::error::ASC_KEY_P8_BASE64 is not an App Store Connect key"); sys.exit(1)
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "AuthKey.p8"), "w") as f:
+              f.write(key + "\n")
+          PY
+      - name: Prepare (and submit) the version
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
+        run: |
+          python scripts/ios/appstore_submit.py --version "${{ inputs.version }}" --build "${{ inputs.build }}" \
+            ${{ inputs.submit && '--submit' || '' }} | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Remove the key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/AuthKey.p8"
