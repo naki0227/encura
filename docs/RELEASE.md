@@ -88,7 +88,7 @@ DB の鍵は Claude に渡しません。Routine の作成は、手順 1〜4 が
 
 ## 6.4 作品画像のコピー（自動）
 
-作品・今日の一枚・ニュースの画像は、Wikimedia Commons と、作品を CC0 で公開している美術館（メトロポリタン美術館、シカゴ美術館、クリーブランド美術館）から取っています。アプリが毎回そこへ取りに行くと、相手のサーバーに止められたときに画像が出なくなるため、縮小したコピーを Supabase Storage のバケット `art-images` に置き、アプリはまずそこから読みます（なければ元の画像を読む）。
+作品・今日の一枚・ニュースの画像は、Wikimedia Commons と、作品を CC0 で公開している美術館（メトロポリタン美術館、クリーブランド美術館）から取っています。アプリが毎回そこへ取りに行くと、相手のサーバーに止められたときに画像が出なくなるため、縮小したコピーを Supabase Storage のバケット `art-images` に置き、アプリはまずそこから読みます（なければ元の画像を読む）。
 
 - コピーは **Actions → Mirror Images** が作ります。本番 DB の更新のあとと毎日 1 回動き、まだコピーのない画像だけを取りに行きます。手で **Run workflow** してもかまいません。
 - 書き込みには Supabase の秘密キーが要ります。**Supabase の Project Settings → API Keys** で、Secret keys に新しいキー（名前は `github-mirror` など）を作り、GitHub の **Settings → Secrets and variables → Actions** に Secret `SUPABASE_SERVICE_ROLE_KEY` として登録してください（古い形式の service_role キーでもかまいません）。ワークフローはログに出さずに使います。

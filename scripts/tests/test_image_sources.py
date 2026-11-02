@@ -30,6 +30,6 @@ def test_museum_hits_must_match_artist_and_title():
 
 def test_only_the_holding_museum_is_asked():
     assert museums.museum_for("メトロポリタン美術館") is museums.met
-    assert museums.museum_for("The Art Institute of Chicago") is museums.aic
+    assert museums.museum_for("シカゴ美術館") is None  # its image server refuses the mirror
     assert museums.museum_for("ルーヴル美術館") is None
     assert museums.find("Mona Lisa", "Leonardo da Vinci", "ルーヴル美術館") is None
