@@ -52,11 +52,12 @@ class Client:
     def call(self, method: str, path: str, ok_conflict: bool = False, **kw) -> dict:
         res = self.http.request(method, API + path, headers={"Authorization": f"Bearer {self._token()}"},
                                 timeout=60, **kw)
-        if res.status_code == 409 and ok_conflict:
-            print(f"  (already done: {res.text[:200]})")
+        if res.status_code == 409 and ok_conflict and "already" in res.text.lower():
+            print("  (already done)")
             return {}
         if res.status_code >= 400:
-            raise SystemExit(f"{method} {path} -> {res.status_code}: {res.text[:800]}")
+            # Apple lists what is missing in associatedErrors; print it all.
+            raise SystemExit(f"{method} {path} -> {res.status_code}: {res.text[:6000]}")
         return res.json() if res.content else {}
 
     def get(self, path: str, **params) -> dict:
