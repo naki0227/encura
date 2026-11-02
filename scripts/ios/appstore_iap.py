@@ -147,6 +147,9 @@ def ensure_screenshot(asc: Client, iap_id: str) -> None:
         print("  review screenshot already uploaded")
         return
     if current.get("data"):
+        errors = current["data"]["attributes"].get("assetDeliveryState", {}).get("errors")
+        if errors:
+            print(f"  Apple's error for the old screenshot: {errors}")
         asc.write("DELETE", f"/v1/inAppPurchaseAppStoreReviewScreenshots/{current['data']['id']}", None,
                   f"  remove the unfinished review screenshot ({state})")
     data = SCREENSHOT.read_bytes()
