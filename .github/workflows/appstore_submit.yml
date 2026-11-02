@@ -16,6 +16,10 @@ on:
         description: 'Make the changes and submit for review (off = dry run)'
         type: boolean
         default: false
+      withdraw:
+        description: 'First take back a submission still waiting for review'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -55,7 +59,7 @@ jobs:
         run: |
           set -o pipefail
           python scripts/ios/appstore_submit.py --version "${{ inputs.version }}" --build "${{ inputs.build }}" \
-            ${{ inputs.submit && '--submit' || '' }} | tee -a "$GITHUB_STEP_SUMMARY"
+            ${{ inputs.submit && '--submit' || '' }} ${{ inputs.withdraw && '--withdraw' || '' }} | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Remove the key
         if: always()
         run: rm -f "$RUNNER_TEMP/AuthKey.p8"

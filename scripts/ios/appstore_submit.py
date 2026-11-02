@@ -126,6 +126,8 @@ def main() -> int:
     parser.add_argument("--version", required=True)
     parser.add_argument("--build", required=True, help="CFBundleVersion of the TestFlight build")
     parser.add_argument("--submit", action="store_true", help="make the changes and submit for review")
+    parser.add_argument("--withdraw", action="store_true",
+                        help="first take back a submission that is still waiting for review")
     args = parser.parse_args()
 
     key = Path(os.environ["ASC_KEY_PATH"]).read_text()
@@ -155,6 +157,23 @@ def main() -> int:
     if live:
         print(f"on sale now: {live[0]['attributes']['versionString']}")
     version = next((v for v in versions if v["attributes"]["versionString"] == args.version), None)
+    if version and args.withdraw and version["attributes"]["appStoreState"] == "WAITING_FOR_REVIEW":
+        waiting = asc.get("/v1/reviewSubmissions", **{"filter[app]": app_id, "filter[platform]": "IOS",
+                                                      "filter[state]": "WAITING_FOR_REVIEW"})["data"]
+        for w in waiting:
+            asc.write("PATCH", f"/v1/reviewSubmissions/{w['id']}",
+                      {"data": {"type": "reviewSubmissions", "id": w["id"], "attributes": {"canceled": True}}},
+                      f"withdraw the waiting submission {w['id']}")
+        if asc.dry_run:
+            print("[dry run] the rest would run once the version can be edited again")
+            return 0
+        # Cancelling takes a little while; wait until the version can be edited.
+        for _ in range(30):
+            time.sleep(10)
+            version = asc.get(f"/v1/appStoreVersions/{version['id']}")["data"]
+            print(f"  version is {version['attributes']['appStoreState']}")
+            if version["attributes"]["appStoreState"] in EDITABLE:
+                break
     if version and version["attributes"]["appStoreState"] not in EDITABLE:
         raise SystemExit(f"version {args.version} is {version['attributes']['appStoreState']}; nothing to do")
     other = [v for v in versions if v["attributes"]["appStoreState"] in EDITABLE
@@ -237,10 +256,16 @@ def main() -> int:
             if iap_state == "MISSING_METADATA":
                 raise SystemExit(f"{product} is missing metadata; run the App Store IAP workflow first")
             if iap_state in ("READY_TO_SUBMIT", "DEVELOPER_ACTION_NEEDED", "REJECTED"):
-                asc.write("POST", "/v1/inAppPurchaseSubmissions",
-                          {"data": {"type": "inAppPurchaseSubmissions", "relationships": {
-                              "inAppPurchaseV2": {"data": {"type": "inAppPurchases", "id": iap["id"]}}}}},
-                          f"add In-App Purchase {product} to the submission", ok_conflict=True)
+                try:
+                    asc.write("POST", "/v1/inAppPurchaseSubmissions",
+                              {"data": {"type": "inAppPurchaseSubmissions", "relationships": {
+                                  "inAppPurchaseV2": {"data": {"type": "inAppPurchases", "id": iap["id"]}}}}},
+                              f"add In-App Purchase {product} to the submission", ok_conflict=True)
+                except SystemExit as err:
+                    # Never submit the version without its first In-App Purchases.
+                    if "FIRST_CONSUMABLE" in str(err) or " 409" not in str(err):
+                        raise SystemExit(f"{err}\nnot submitted: {product} could not join the version")
+                    print(f"  {product}: {str(err)[:300]} (already in the submission; continuing)")
             else:
                 print(f"In-App Purchase {product}: {iap_state}")
         asc.write("PATCH", f"/v1/reviewSubmissions/{sub['id']}",
