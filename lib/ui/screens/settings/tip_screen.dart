@@ -41,7 +41,7 @@ class _TipScreenState extends State<TipScreen> {
                   style: TextStyle(color: Palette.text, fontSize: 22, fontWeight: FontWeight.w700)),
               const SizedBox(height: 14),
               const Text(
-                'EnCura は学生が個人で開発しています。展覧会の情報や作品の解説を増やし続けるための応援を、アプリ内課金で受け付けています。',
+                'EnCura は学生が個人で開発しています。いただいた応援は、実際に美術館や展覧会へ足を運んで確かめることや、解説と作品情報の質を上げることに使います。',
                 style: TextStyle(color: Palette.textSub, fontSize: 13, height: 1.9),
               ),
               const SizedBox(height: 8),
@@ -84,7 +84,7 @@ class _TipScreenState extends State<TipScreen> {
             const Text('ありがとうございます！',
                 style: TextStyle(color: Palette.text, fontSize: 22, fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
-            const Text('いただいた応援は、展覧会の情報と作品の解説を増やすことに使います。',
+            const Text('いただいた応援は、美術館や展覧会に足を運ぶことと、EnCura の質を上げることに使います。',
                 textAlign: TextAlign.center, style: TextStyle(color: Palette.textSub, fontSize: 13, height: 1.8)),
             const SizedBox(height: 28),
             OutlinedButton(
