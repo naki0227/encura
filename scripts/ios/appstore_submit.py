@@ -12,6 +12,8 @@ What it sets (from docs/RELEASE.md, "リリースノート案（<version>）"):
   * the version <version>, created if missing, with build <build> attached
   * "What's New", support URL and marketing URL for every localization
   * the privacy policy URL for every app info localization
+  * name, subtitle, keywords, promotional text and description from
+    docs/appstore/metadata.json, for the locales it lists
   * the review contact e-mail
 Things the API cannot change (App Privacy answers, screenshots) stay as they
 are in App Store Connect.
@@ -35,6 +37,9 @@ MARKETING_URL = "https://enludus.com"
 PRIVACY_URL = "https://enludus.com/products/encura-privacy"
 CONTACT_EMAIL = "contact@enludus.com"
 RELEASE_DOC = Path(__file__).resolve().parents[2] / "docs" / "RELEASE.md"
+# Store texts per locale ("ja"): name, subtitle, keywords, promotionalText, description.
+METADATA = Path(__file__).resolve().parents[2] / "docs" / "appstore" / "metadata.json"
+LIMITS = {"name": 30, "subtitle": 30, "keywords": 100, "promotionalText": 170, "description": 4000}
 EDITABLE = {"PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED", "METADATA_REJECTED",
             "INVALID_BINARY", "DEVELOPER_REMOVED_FROM_SALE"}
 
@@ -70,6 +75,33 @@ class Client:
         return self.call(method, path, ok_conflict=ok_conflict, json=body)
 
 
+def refused_characters(text: str) -> list[str]:
+    """Symbols App Store Connect refuses in store texts (such as ♡ and emoji)."""
+    return sorted({c for c in text if ord(c) > 0xFFFF or 0x2600 <= ord(c) <= 0x27BF})
+
+
+def store_texts() -> dict[str, dict[str, str]]:
+    if not METADATA.exists():
+        return {}
+    import json
+    texts = json.loads(METADATA.read_text(encoding="utf-8"))
+    for locale, fields in texts.items():
+        for key, value in fields.items():
+            if key not in LIMITS:
+                raise SystemExit(f"{METADATA}: unknown field {key}")
+            if len(value) > LIMITS[key]:
+                raise SystemExit(f"{METADATA}: {locale}.{key} is {len(value)} characters (max {LIMITS[key]})")
+            bad = refused_characters(value)
+            if bad:
+                raise SystemExit(f"{METADATA}: {locale}.{key} contains {' '.join(bad)}")
+    return texts
+
+
+def for_locale(texts: dict[str, dict[str, str]], locale: str) -> dict[str, str]:
+    """Texts for "ja-JP" or "ja"."""
+    return texts.get(locale) or texts.get(locale.split("-")[0]) or {}
+
+
 def release_notes(version: str) -> str:
     text = RELEASE_DOC.read_text(encoding="utf-8")
     match = re.search(rf"## リリースノート案（{re.escape(version)}）\s*```\n(.*?)\n```", text, re.S)
@@ -77,7 +109,7 @@ def release_notes(version: str) -> str:
         raise SystemExit(f"no release notes for {version} in {RELEASE_DOC}")
     notes = match.group(1).strip()
     # App Store Connect refuses symbols such as ♡ and emoji in "What's New".
-    bad = sorted({c for c in notes if ord(c) > 0xFFFF or 0x2600 <= ord(c) <= 0x27BF})
+    bad = refused_characters(notes)
     if bad:
         raise SystemExit(f"release notes contain characters App Store Connect refuses: {' '.join(bad)}")
     if len(notes) > 4000:
@@ -95,6 +127,7 @@ def main() -> int:
     key = Path(os.environ["ASC_KEY_PATH"]).read_text()
     asc = Client(os.environ["ASC_KEY_ID"], os.environ["ASC_ISSUER_ID"], key, dry_run=not args.submit)
     notes = release_notes(args.version)
+    texts = store_texts()
 
     apps = asc.get("/v1/apps", **{"filter[bundleId]": BUNDLE_ID})["data"]
     if not apps:
@@ -144,12 +177,14 @@ def main() -> int:
         asc.write("PATCH", f"/v1/appStoreVersions/{vid}/relationships/build",
                   {"data": {"type": "builds", "id": build["id"]}}, f"select build {args.build}")
         for loc in asc.get(f"/v1/appStoreVersions/{vid}/appStoreVersionLocalizations")["data"]:
+            extra = {k: v for k, v in for_locale(texts, loc["attributes"]["locale"]).items()
+                     if k in ("keywords", "promotionalText", "description")}
             asc.write("PATCH", f"/v1/appStoreVersionLocalizations/{loc['id']}",
                       {"data": {"type": "appStoreVersionLocalizations", "id": loc["id"],
                                 "attributes": {"whatsNew": notes, "supportUrl": SUPPORT_URL,
-                                               "marketingUrl": MARKETING_URL}}},
-                      f"set What's New, support and marketing URLs ({loc['attributes']['locale']}; "
-                      f"support now {loc['attributes'].get('supportUrl')})")
+                                               "marketingUrl": MARKETING_URL, **extra}}},
+                      f"set What's New, URLs{', ' + ', '.join(extra) if extra else ''} "
+                      f"({loc['attributes']['locale']})")
         detail = asc.get(f"/v1/appStoreVersions/{vid}/appStoreReviewDetail").get("data")
         if detail and detail["attributes"].get("contactEmail") != CONTACT_EMAIL:
             asc.write("PATCH", f"/v1/appStoreReviewDetails/{detail['id']}",
@@ -164,12 +199,14 @@ def main() -> int:
                 "PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED"):
             continue
         for loc in asc.get(f"/v1/appInfos/{info['id']}/appInfoLocalizations")["data"]:
-            if loc["attributes"].get("privacyPolicyUrl") != PRIVACY_URL:
+            attrs = {"privacyPolicyUrl": PRIVACY_URL,
+                     **{k: v for k, v in for_locale(texts, loc["attributes"]["locale"]).items()
+                        if k in ("name", "subtitle")}}
+            if any(loc["attributes"].get(k) != v for k, v in attrs.items()):
                 asc.write("PATCH", f"/v1/appInfoLocalizations/{loc['id']}",
-                          {"data": {"type": "appInfoLocalizations", "id": loc["id"],
-                                    "attributes": {"privacyPolicyUrl": PRIVACY_URL}}},
-                          f"set the privacy policy URL ({loc['attributes']['locale']}; "
-                          f"now {loc['attributes'].get('privacyPolicyUrl')})")
+                          {"data": {"type": "appInfoLocalizations", "id": loc["id"], "attributes": attrs}},
+                          f"set {', '.join(attrs)} ({loc['attributes']['locale']}; "
+                          f"name now {loc['attributes'].get('name')})")
 
     print("\nWhat's New:\n" + notes + "\n")
     if not version:
