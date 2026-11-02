@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/config/app_config.dart';
+import 'tip_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -56,7 +57,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Text('・違法な画像や不適切なコンテンツは予告なく削除される場合があります。'),
               SizedBox(height: 24),
               Text(
-                'EnCuraは学生によって個人開発されています。もし気に入っていただけたら、開発継続のための支援をいただけると励みになります。',
+                'EnCuraは学生によって個人開発されています。もし気に入っていただけたら、設定の「開発者を応援する」から応援いただけると励みになります。',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ],
@@ -103,9 +104,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Divider(),
           ListTile(
             leading: const Icon(Icons.volunteer_activism, color: Colors.pinkAccent),
-            title: const Text('開発者を応援する (Ofuse)'),
+            title: const Text('開発者を応援する'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => _launchUrl('https://ofuse.me/292a29e6'),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TipScreen())),
           ),
           const Divider(),
           ListTile(

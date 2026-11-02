@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'core/services/supabase_service.dart';
+import 'core/services/tip_store.dart';
 import 'ui/screens/home/home_screen.dart';
 import 'ui/screens/chat/chat_screen.dart';
 import 'ui/screens/learn/learn_screen.dart';
@@ -13,6 +14,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseService.initialize();
   await SupabaseService.signInAnonymously();
+  // Finish any tip purchase that completed while the app was closed.
+  TipStore.instance.start();
   runApp(const EnCuraApp());
 }
 

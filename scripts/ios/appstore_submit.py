@@ -15,6 +15,8 @@ What it sets (from docs/RELEASE.md, "リリースノート案（<version>）"):
   * name, subtitle, keywords, promotional text and description from
     docs/appstore/metadata.json, for the locales it lists
   * the review contact e-mail
+  * In-App Purchases that are "Ready to Submit" (appstore_iap.py) join the
+    same review submission
 Things the API cannot change (App Privacy answers, screenshots) stay as they
 are in App Store Connect.
 """
@@ -54,9 +56,11 @@ class Client:
         return jwt.encode({"iss": self.issuer, "iat": now, "exp": now + 900, "aud": "appstoreconnect-v1"},
                           self.key, algorithm="ES256", headers={"kid": self.key_id, "typ": "JWT"})
 
-    def call(self, method: str, path: str, ok_conflict: bool = False, **kw) -> dict:
+    def call(self, method: str, path: str, ok_conflict: bool = False, ok_missing: bool = False, **kw) -> dict:
         res = self.http.request(method, API + path, headers={"Authorization": f"Bearer {self._token()}"},
                                 timeout=60, **kw)
+        if res.status_code == 404 and ok_missing:
+            return {}
         if res.status_code == 409 and ok_conflict and "already" in res.text.lower():
             print("  (already done)")
             return {}
@@ -226,6 +230,19 @@ def main() -> int:
                       "reviewSubmission": {"data": {"type": "reviewSubmissions", "id": sub["id"]}},
                       "appStoreVersion": {"data": {"type": "appStoreVersions", "id": version["id"]}}}}},
                   f"add version {args.version} to the submission", ok_conflict=True)
+        # The first In-App Purchases must be reviewed with a version.
+        for iap in asc.get(f"/v1/apps/{app_id}/inAppPurchasesV2", limit="200")["data"]:
+            iap_state = iap["attributes"].get("state")
+            product = iap["attributes"]["productId"]
+            if iap_state == "MISSING_METADATA":
+                raise SystemExit(f"{product} is missing metadata; run the App Store IAP workflow first")
+            if iap_state in ("READY_TO_SUBMIT", "DEVELOPER_ACTION_NEEDED", "REJECTED"):
+                asc.write("POST", "/v1/inAppPurchaseSubmissions",
+                          {"data": {"type": "inAppPurchaseSubmissions", "relationships": {
+                              "inAppPurchaseV2": {"data": {"type": "inAppPurchases", "id": iap["id"]}}}}},
+                          f"add In-App Purchase {product} to the submission", ok_conflict=True)
+            else:
+                print(f"In-App Purchase {product}: {iap_state}")
         asc.write("PATCH", f"/v1/reviewSubmissions/{sub['id']}",
                   {"data": {"type": "reviewSubmissions", "id": sub["id"], "attributes": {"submitted": True}}},
                   "submit for review")
